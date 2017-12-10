@@ -17,11 +17,11 @@ How to create a cmap to be used with rdfcmap?
 
 1) Get CMAP Tools from https://cmap.ihmc.us/
 2) Create a new cmap following guidelines below on formatting 
-a) All nodes of a cmap model are transformed to instances in rdf model
-b) Labels of cmap nodes are transformed to titles of instances using dct:title 
-c) Links between nodes in cmap are transformed to object properties in rdf model.
-d) Labels of links must agree to existing labels (skos:prefLabel) of properties in RDF vocabulary.
-e) Cardinalities can be added to object properties in cmap: default without specification of cardinality is "min 0". Exact cardinality is specified by adding the number, e.g. "has part =1" means there is exactly 1 link of "has part". Minimum cardinality is specified by ">1" (one or more)
+2) a) All nodes of a cmap model are transformed to instances in rdf model
+2) b) Labels of cmap nodes are transformed to titles of instances using dct:title 
+2) c) Links between nodes in cmap are transformed to object properties in rdf model.
+2) d) Labels of links must agree to existing labels (skos:prefLabel) of properties in RDF vocabulary.
+2) e) Cardinalities can be added to object properties in cmap: default without specification of cardinality is "min 0". Exact cardinality is specified by adding the number, e.g. "has part =1" means there is exactly 1 link of "has part". Minimum cardinality is specified by ">1" (one or more)
 3) Export cmap as CXL file
 
 Copyright OSTHUS 2017
