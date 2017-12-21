@@ -285,6 +285,7 @@ public class AFOUtil
 	public static final Resource AFR_FILE = ResourceFactory.createResource(AFR_PREFIX + "AFR_0000639");
 
 	public static final Resource AFE_DEVICE = ResourceFactory.createResource(AFE_PREFIX + "AFE_0000354");
+	public static final Resource OBI_DEVICE = ResourceFactory.createResource(OBI_PREFIX + "_0000968");
 	public static final Resource AFE_SFC = ResourceFactory.createResource(AFE_PREFIX + "AFE_0000673");
 	public static final Resource AFE_COLUMN = ResourceFactory.createResource(AFE_PREFIX + "AFE_0000217");
 	public static final Resource AFE_GUARD_COLUMN = ResourceFactory.createResource(AFE_PREFIX + "AFE_0000430");
@@ -419,6 +420,7 @@ public class AFOUtil
 	public static final Resource AFR_UV_SPECTRUM = ResourceFactory.createResource(AFR_PREFIX + "AFR_0000246");
 	public static final Resource AFR_ESI_SPECTRUM = ResourceFactory.createResource(AFR_PREFIX + "AFR_0000185");
 	public static final Resource AFR_TIME_SERIES = ResourceFactory.createResource(AFR_PREFIX + "AFR_0000576");
+	public static final Resource AFRL_CONTEXTUAL_ROLE = ResourceFactory.createResource(AFRL_PREFIX + "AFRL_0000166");
 
 	public static final Property PROV_WAS_DERIVED_FROM = ResourceFactory.createProperty(PROV_PREFIX + "wasDerivedFrom");
 	public static final Property VOID_FEATURE = ResourceFactory.createProperty(VOID_PREFIX + "feature");
@@ -438,6 +440,13 @@ public class AFOUtil
 	public static final Property SKOS_EDITORIAL_NOTE = ResourceFactory.createProperty(SKOS_PREFIX + "editorialNote");
 	public static final Property AFX_IS_ALIGNED_WITH_BFO = ResourceFactory.createProperty(AFX_PREFIX + "AFX_0002797");
 	public static final Property AFX_IS_DEFINED_CLASS = ResourceFactory.createProperty(AFX_PREFIX + "AFX_0002798");
+
+	public static final Resource BFO_OCCURRENT = ResourceFactory.createResource(BFO_PREFIX + "_0000003");
+	public static final Resource BFO_QUALITY = ResourceFactory.createResource(BFO_PREFIX + "_0000019");
+	public static final Resource BFO_ROLE = ResourceFactory.createResource(BFO_PREFIX + "_0000023");
+	public static final Resource BFO_FUNCTION = ResourceFactory.createResource(BFO_PREFIX + "_0000034");
+	public static final Resource BFO_MATERIAL = ResourceFactory.createResource(BFO_PREFIX + "_0000040");
+	public static final Resource IAO_INFORMATION_CONTENT_ENTITY = ResourceFactory.createResource(IAO_PREFIX + "_0000030");
 
 	private static final Map<String, String> aftPrefixMap = new HashMap<String, String>()
 	{

@@ -684,7 +684,7 @@ public class Turtle2CmapConverter
 		}
 		else
 		{
-			log.warn("Found image without visualization identifier. Image URI: " + resource.getURI());
+			log.debug("Found image without visualization identifier. Image URI: " + resource.getURI());
 		}
 
 		if (resource.hasProperty(VizUtil.AFV_BYTES))
@@ -1419,6 +1419,13 @@ public class Turtle2CmapConverter
 				pos += size;
 			}
 		}
-		return sb.toString();
+
+		// make sure there are no linebreaks inbetween escaped quotes
+		String stringWithLinebreaks = sb.toString();
+		if (stringWithLinebreaks.contains("\\&#10;\""))
+		{
+			stringWithLinebreaks = stringWithLinebreaks.replaceAll("\\&#10;\"", "\\\"&#10;");
+		}
+		return stringWithLinebreaks;
 	}
 }

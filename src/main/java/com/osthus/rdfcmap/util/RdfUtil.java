@@ -354,7 +354,17 @@ public class RdfUtil
 
 	public static Resource getResourceByLabel(Model model, String label, boolean includeProperties, boolean isResourceExpected)
 	{
-		if (label == null || label.isEmpty() || label.contains("^^"))
+		if (label == null || label.isEmpty())
+		{
+			return null;
+		}
+
+		if (label.contains("&#10;"))
+		{
+			label = label.replaceAll("&#10;", "");
+		}
+
+		if (label.contains("^^"))
 		{
 			return null;
 		}

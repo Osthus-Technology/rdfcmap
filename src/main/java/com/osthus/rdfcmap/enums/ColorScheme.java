@@ -17,10 +17,12 @@ public class ColorScheme
 			put(DomainEnum.COMMON.name(), "255,255,255,255");
 			put(DomainEnum.MATERIAL.name(), "194,231,194,255");
 			put(DomainEnum.PROCESS.name(), "202,163,241,255");
-			put(DomainEnum.RESULT.name(), "241,202,163,255");
+			put(DomainEnum.RESULT.name(), "255,204,0,255");
+			put(DomainEnum.INFORMATION.name(), "255,204,0,255");
 			put(DomainEnum.EQUIPMENT.name(), "170,213,255,255");
 			put(DomainEnum.PROPERTY.name(), "255,255,255,255");
 			put(DomainEnum.QUALITY.name(), "255,255,153,255");
+			put(DomainEnum.CONTEXTUAL_ROLE.name(), "255,200,150,255");
 			put(DomainEnum.ROLE.name(), "255,153,204,255");
 			put(DomainEnum.OTHER.name(), "255,255,255,255");
 		}

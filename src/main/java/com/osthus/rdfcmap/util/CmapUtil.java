@@ -542,12 +542,45 @@ public class CmapUtil
 				else if (rdfType.getURI().contains(AFOUtil.AFRL_PREFIX)
 						|| (resource.getURI().startsWith(CmapUtil.URN_UUID) && resource.getURI().contains("AFRL_")))
 				{
-					domain = DomainEnum.ROLE;
+					if (isSubClassOf(rdfType, AFOUtil.AFRL_CONTEXTUAL_ROLE, model, null))
+					{
+						domain = DomainEnum.CONTEXTUAL_ROLE;
+					}
+					else
+					{
+						domain = DomainEnum.ROLE;
+					}
 				}
 				else if (rdfType.getURI().contains(AFOUtil.AFX_PREFIX)
 						|| (resource.getURI().startsWith(CmapUtil.URN_UUID) && resource.getURI().contains("AFX_")))
 				{
 					domain = DomainEnum.PROPERTY;
+				}
+				else if (rdfType.getURI().contains(AFOUtil.QUDT_QUANTITY_EXT_PREFIX) || rdfType.getURI().contains(AFOUtil.QUDT_SCHEMA_EXT_PREFIX)
+						|| rdfType.getURI().contains(AFOUtil.QUDT_SCHEMA_PREFIX) || rdfType.getURI().contains(AFOUtil.QUDT_UNIT_PREFIX)
+						|| rdfType.getURI().contains(AFOUtil.QUDT_UNIT_EXT_PREFIX))
+				{
+					if (isSubClassOf(rdfType, AFOUtil.OWL_OBJECT_PROPERTY, model, null) || isSubClassOf(rdfType, AFOUtil.OWL_DATATYPE_PROPERTY, model, null)
+							|| isSubClassOf(rdfType, AFOUtil.OWL_ANNOTATION_PROPERTY, model, null))
+					{
+						domain = DomainEnum.PROPERTY;
+					}
+					else
+					{
+						domain = DomainEnum.INFORMATION;
+					}
+				}
+				else if (rdfType.getURI().contains(AFOUtil.IAO_PREFIX))
+				{
+					if (isSubClassOf(rdfType, AFOUtil.OWL_OBJECT_PROPERTY, model, null) || isSubClassOf(rdfType, AFOUtil.OWL_DATATYPE_PROPERTY, model, null)
+							|| isSubClassOf(rdfType, AFOUtil.OWL_ANNOTATION_PROPERTY, model, null))
+					{
+						domain = DomainEnum.PROPERTY;
+					}
+					else
+					{
+						domain = DomainEnum.INFORMATION;
+					}
 				}
 				else if (rdfType.getURI().equals(AFOUtil.OWL_OBJECT_PROPERTY.getURI()))
 				{
@@ -560,6 +593,42 @@ public class CmapUtil
 						}
 					}
 				}
+				else
+				{
+					if (isSubClassOf(rdfType, AFOUtil.OWL_OBJECT_PROPERTY, model, null) || isSubClassOf(rdfType, AFOUtil.OWL_DATATYPE_PROPERTY, model, null)
+							|| isSubClassOf(rdfType, AFOUtil.OWL_ANNOTATION_PROPERTY, model, null))
+					{
+						domain = DomainEnum.PROPERTY;
+					}
+					else if (isSubClassOf(rdfType, AFOUtil.BFO_OCCURRENT, model, null))
+					{
+						domain = DomainEnum.PROCESS;
+					}
+					else if (isSubClassOf(rdfType, AFOUtil.AFE_DEVICE, model, null) || isSubClassOf(rdfType, AFOUtil.OBI_DEVICE, model, null))
+					{
+						domain = DomainEnum.PROCESS;
+					}
+					else if (isSubClassOf(rdfType, AFOUtil.BFO_MATERIAL, model, null) && !isSubClassOf(rdfType, AFOUtil.OBI_DEVICE, model, null))
+					{
+						domain = DomainEnum.MATERIAL;
+					}
+					else if (isSubClassOf(rdfType, AFOUtil.BFO_QUALITY, model, null))
+					{
+						domain = DomainEnum.QUALITY;
+					}
+					else if (isSubClassOf(rdfType, AFOUtil.BFO_ROLE, model, null) && !isSubClassOf(rdfType, AFOUtil.AFRL_CONTEXTUAL_ROLE, model, null))
+					{
+						domain = DomainEnum.ROLE;
+					}
+					else if (isSubClassOf(rdfType, AFOUtil.BFO_FUNCTION, model, null))
+					{
+						domain = DomainEnum.ROLE;
+					}
+					else if (isSubClassOf(rdfType, AFOUtil.IAO_INFORMATION_CONTENT_ENTITY, model, null))
+					{
+						domain = DomainEnum.INFORMATION;
+					}
+				}
 
 				if (domain != DomainEnum.COMMON && domain != DomainEnum.OTHER)
 				{
@@ -570,6 +639,44 @@ public class CmapUtil
 
 		String bgColor = ColorScheme.domain2scheme.get(domain.name());
 		return bgColor;
+	}
+
+	private static boolean isSubClassOf(Resource resource, Resource classType, Model model, List<Resource> visited)
+	{
+		StmtIterator stmtIterator = model.listStatements(resource, AFOUtil.RDFS_SUBCLASS_OF, (RDFNode) null);
+		while (stmtIterator.hasNext())
+		{
+			Statement statement = stmtIterator.next();
+			RDFNode parentClass = statement.getObject();
+			if (parentClass.isAnon())
+			{
+				continue;
+			}
+
+			if (visited == null)
+			{
+				visited = new ArrayList<Resource>();
+				visited.add(resource);
+			}
+
+			if (visited.contains(parentClass.asResource()))
+			{
+				continue;
+			}
+
+			visited.add(parentClass.asResource());
+
+			if (classType.getURI().equals(parentClass.asResource().getURI()))
+			{
+				return true;
+			}
+
+			if (isSubClassOf(parentClass.asResource(), classType, model, visited))
+			{
+				return true;
+			}
+		}
+		return false;
 	}
 
 	public static String determineFontColor(Model model, Resource uiResource)
