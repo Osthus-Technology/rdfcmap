@@ -7,11 +7,10 @@ Usage to convert from CXL to TTL
 Usage to convert from TTL to CXL:
 "c:\path\to\jdk8\bin\java" -Dlog4j.configurationFile=resources/log4j2.xml -jar rdf-cmap.jar -i your-input-rdf-model.ttl
 
-Note: Conversion from CXL to TTL supports vocabulary of AFO2.0, conversion from TTL to CXL needs major revision and is currently restricted to AFT1.1.5.  
+Note: Conversion from CXL to TTL supports vocabulary of AFO2.0
 
 Use --help to see command line options
 "c:\path\to\jdk8\bin\java" -Dlog4j.configurationFile=resources/log4j2.xml -jar rdf-cmap.jar --help
-
 
 How to create a cmap to be used with rdfcmap?
 
@@ -24,7 +23,18 @@ How to create a cmap to be used with rdfcmap?
 7) Cardinalities can be added to object properties in cmap: default without specification of cardinality is "min 0". Exact cardinality is specified by adding the number, e.g. "has part =1" means there is exactly 1 link of "has part". Minimum cardinality is specified by ">1" (one or more)
 8) Export cmap as CXL file
 
-Copyright OSTHUS 2017
+Changelog:
+V2.2.0 
+  Updated conversion from ttl to cmap in order to support BFO aligned models
+  Note: Conversion from TTL to CXL requires layouting of concepts in order to get a useful visualization. Enabling automatic layouting with rdfcmap needs additional third-party dependencies. Currently, rdfcmap supports layouting based on graphviz as well as different layout algorithms provided by gephi. Please contact OSTHUS for further information (office(at)osthus(dot)com).  
+  
+V2.1.4 
+  Updated conversion from cmap to ttl in order to support BFO aligned models
+  Added SPARQL export
+  Added Shape export
+  Added ADF export
+
+Copyright OSTHUS 2016-2018
 
 
  
