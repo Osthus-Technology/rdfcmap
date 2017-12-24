@@ -271,6 +271,36 @@ public class CxlWriter
 				sb.append("\" font-size=\"" + fontSize);
 			}
 
+			String borderShape = StringUtils.EMPTY;
+			if (concept.getProperty(VizUtil.AFV_HAS_BORDER) != null)
+			{
+				Resource borderResource = concept.getProperty(VizUtil.AFV_HAS_BORDER).getResource();
+				if (borderResource.hasProperty(VizUtil.AFV_SHAPE))
+				{
+					borderShape = borderResource.getProperty(VizUtil.AFV_SHAPE).getString();
+				}
+			}
+
+			if (!borderShape.isEmpty())
+			{
+				sb.append("\" border-shape=\"" + borderShape);
+			}
+
+			String borderColor = StringUtils.EMPTY;
+			if (concept.getProperty(VizUtil.AFV_HAS_BORDER) != null)
+			{
+				Resource borderResource = concept.getProperty(VizUtil.AFV_HAS_BORDER).getResource();
+				if (borderResource.hasProperty(VizUtil.AFV_COLOR))
+				{
+					borderColor = borderResource.getProperty(VizUtil.AFV_COLOR).getString();
+				}
+			}
+
+			if (!borderColor.isEmpty())
+			{
+				sb.append("\" border-color=\"" + borderColor);
+			}
+
 			String backgroundColor = StringUtils.EMPTY;
 			if (concept.hasProperty(VizUtil.AFV_BACKGROUND_COLOR))
 			{

@@ -159,14 +159,17 @@ public class AFOUtil
 	public static final Resource OWL_DATATYPE_PROPERTY = ResourceFactory.createResource(OWL_PREFIX + "DatatypeProperty");
 	public static final Resource OWL_ANNOTATION_PROPERTY = ResourceFactory.createResource(OWL_PREFIX + "AnnotationProperty");
 	public static final Resource OWL_RESTRICTION = ResourceFactory.createResource(OWL_PREFIX + "Restriction");
+	public static final Resource OWL_AXIOM = ResourceFactory.createResource(OWL_PREFIX + "Axiom");
 	public static final Resource OWL_THING = ResourceFactory.createResource(OWL_PREFIX + "Thing");
 	public static final Property OWL_ALL_VALUES_FROM = ResourceFactory.createProperty(OWL_PREFIX + "allValuesFrom");
+	public static final Resource OWL_ALL_DIFFERENT = ResourceFactory.createResource(OWL_PREFIX + "AllDifferent");
 	public static final Property OWL_SOME_VALUES_FROM = ResourceFactory.createProperty(OWL_PREFIX + "someValuesFrom");
 	public static final Property OWL_CARDINALITY = ResourceFactory.createProperty(OWL_PREFIX + "cardinality");
 	public static final Property OWL_MIN_CARDINALITY = ResourceFactory.createProperty(OWL_PREFIX + "minCardinality");
 	public static final Property OWL_MAX_CARDINALITY = ResourceFactory.createProperty(OWL_PREFIX + "maxCardinality");
 	public static final Property OWL_ON_CLASS = ResourceFactory.createProperty(OWL_PREFIX + "onClass");
 	public static final Property OWL_ON_PROPERTY = ResourceFactory.createProperty(OWL_PREFIX + "onProperty");
+	public static final Resource RDFS_DATATYPE = ResourceFactory.createResource(RDFS_PREFIX + "Datatype");
 	public static final Property RDF_TYPE = ResourceFactory.createProperty(RDF_PREFIX + "type");
 	public static final Property RDF_FIRST = ResourceFactory.createProperty(RDF_PREFIX + "first");
 	public static final Property RDF_REST = ResourceFactory.createProperty(RDF_PREFIX + "rest");
@@ -283,6 +286,7 @@ public class AFOUtil
 	public static final Resource AFR_ELECTRONIC_LAB_NOTEBOOK = ResourceFactory.createResource(AFR_PREFIX + "AFR_0000882");
 	public static final Resource AFR_ABSORPTION_CHROMATOGRAM = ResourceFactory.createResource(AFR_PREFIX + "AFR_0000436");
 	public static final Resource AFR_FILE = ResourceFactory.createResource(AFR_PREFIX + "AFR_0000639");
+	public static final Resource AFR_SCALAR_QUANTITY_DATUM = ResourceFactory.createResource(AFR_PREFIX + "AFR_0000989");
 
 	public static final Resource AFE_DEVICE = ResourceFactory.createResource(AFE_PREFIX + "AFE_0000354");
 	public static final Resource OBI_DEVICE = ResourceFactory.createResource(OBI_PREFIX + "_0000968");

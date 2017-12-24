@@ -361,12 +361,45 @@ public class RdfUtil
 
 		if (label.contains("&#10;"))
 		{
-			label = label.replaceAll("&#10;", "");
+			label = label.replaceAll("&#10;", "").trim();
+		}
+
+		if (label.contains("["))
+		{
+			label = label.replaceAll("\\[", "").trim();
+		}
+
+		if (label.contains("]"))
+		{
+			label = label.replaceAll("\\]", "").trim();
+		}
+
+		if (label.contains("instance of"))
+		{
+			label = label.replaceAll("instance of", "").trim();
+		}
+
+		if (label.contains("NamedIndividual"))
+		{
+			label = label.replaceAll("NamedIndividual", "").trim();
 		}
 
 		if (label.contains("^^"))
 		{
 			return null;
+		}
+
+		if (label.contains(","))
+		{
+			String[] types = label.split(",");
+			for (int i = 0; i < types.length; i++)
+			{
+				label = types[i].trim();
+				if (label.toLowerCase().startsWith("af"))
+				{
+					break;
+				}
+			}
 		}
 
 		String[] segments = label.split(":");

@@ -811,7 +811,7 @@ public class Cmap2TurtleConverter
 		return prefix + ":" + propertyAsResource.getLocalName();
 	}
 
-	private static String getPrefixForOboTermLabel(String name)
+	public static String getPrefixForOboTermLabel(String name)
 	{
 		String prefix;
 		if (name.startsWith("BFO"))
@@ -829,6 +829,18 @@ public class Cmap2TurtleConverter
 		else if (name.startsWith("RO"))
 		{
 			prefix = "ro";
+		}
+		else if (name.startsWith("CHEBI"))
+		{
+			prefix = "chebi";
+		}
+		else if (name.startsWith("PATO"))
+		{
+			prefix = "pato";
+		}
+		else if (name.contains("_"))
+		{
+			prefix = name.split("_")[0].toLowerCase();
 		}
 		else
 		{
@@ -1954,7 +1966,7 @@ public class Cmap2TurtleConverter
 			}
 
 			String title = StringUtils.EMPTY;
-			List<Statement> singleInstanceStatements = new ArrayList<>();
+			Set<Statement> singleInstanceStatements = new HashSet<Statement>();
 			StmtIterator singleInstanceIterator = model.listStatements(statement.getSubject(), (Property) null, (RDFNode) null);
 			while (singleInstanceIterator.hasNext())
 			{
@@ -1968,7 +1980,7 @@ public class Cmap2TurtleConverter
 				}
 			}
 
-			singleInstanceModel.add(singleInstanceStatements);
+			singleInstanceModel.add(new ArrayList<Statement>(singleInstanceStatements));
 			statementsToRemoveFromOtherTriplesModel.addAll(singleInstanceStatements);
 			if (singleInstanceModel.isEmpty())
 			{
@@ -2636,7 +2648,7 @@ public class Cmap2TurtleConverter
 			}
 
 			String title = StringUtils.EMPTY;
-			List<Statement> singleInstanceStatements = new ArrayList<>();
+			Set<Statement> singleInstanceStatements = new HashSet<Statement>();
 			StmtIterator singleInstanceIterator = model.listStatements(statement.getSubject(), (Property) null, (RDFNode) null);
 			while (singleInstanceIterator.hasNext())
 			{
@@ -2650,7 +2662,7 @@ public class Cmap2TurtleConverter
 				}
 			}
 
-			singleInstanceModel.add(singleInstanceStatements);
+			singleInstanceModel.add(new ArrayList<Statement>(singleInstanceStatements));
 			statementsToRemoveFromOtherTriplesModel.addAll(singleInstanceStatements);
 			if (singleInstanceModel.isEmpty())
 			{

@@ -23,6 +23,8 @@ import org.apache.commons.io.output.ByteArrayOutputStream;
 import org.apache.commons.lang3.StringEscapeUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.text.translate.NumericEntityEscaper;
+import org.apache.jena.graph.BlankNodeId;
+import org.apache.jena.rdf.model.AnonId;
 import org.apache.jena.rdf.model.Model;
 import org.apache.jena.rdf.model.ModelFactory;
 import org.apache.jena.rdf.model.Property;
@@ -38,6 +40,7 @@ import org.xml.sax.SAXException;
 import com.osthus.rdfcmap.RdfCmap;
 import com.osthus.rdfcmap.cmap.cardinality.Cardinality;
 import com.osthus.rdfcmap.cmap.cardinality.StatementWithCardinality;
+import com.osthus.rdfcmap.cmap.layout.Layouter;
 import com.osthus.rdfcmap.enums.ConceptProperty;
 import com.osthus.rdfcmap.helper.ConceptRelation;
 import com.osthus.rdfcmap.helper.LinkedConcept;
@@ -60,6 +63,8 @@ public class Turtle2CmapConverter
 	private static final int MAX_CHARS = 15;
 
 	List<Resource> resources = new ArrayList<>();
+
+	public static Set<String> allNodeIdsOfInstanceGraph = new HashSet<>();
 
 	private static Map<Resource, ConceptRelation> link2conceptRelations = new HashMap<Resource, ConceptRelation>();
 
@@ -125,19 +130,51 @@ public class Turtle2CmapConverter
 		Map<String, Map<String, String>> imageId2UiProperties = new HashMap<>();
 		Map<String, Set<LinkedConcept>> linkId2LinkedConcepts = new HashMap<>();
 
+		HashSet<Resource> visited = new HashSet<Resource>();
 		if (!model.contains((Resource) null, AFOUtil.RDF_TYPE, VizUtil.AFV_MAP))
 		{
 			// create completely new CMap
+
+			// collect all nodes of instance graph
+			allNodeIdsOfInstanceGraph = collectNodeIds(model);
+
 			StmtIterator stmtIterator = model.listStatements();
 			while (stmtIterator.hasNext())
 			{
 				Statement statement = stmtIterator.next();
-				if (!statement.getSubject().toString().startsWith(CmapUtil.URN_UUID))
+
+				if (visited.contains(statement.getSubject()))
 				{
 					continue;
 				}
 
-				String subjectKey = statement.getSubject().toString();
+				visited.add(statement.getSubject());
+
+				if (statement.getSubject().isAnon())
+				{
+					if (!allNodeIdsOfInstanceGraph.contains(statement.getSubject().getId().getBlankNodeId().getLabelString()))
+					{
+						continue;
+					}
+				}
+				else
+				{
+					if (!allNodeIdsOfInstanceGraph.contains(statement.getSubject().getURI()))
+					{
+						continue;
+					}
+				}
+
+				String subjectKey = StringUtils.EMPTY;
+
+				if (statement.getSubject().isURIResource())
+				{
+					subjectKey = statement.getSubject().toString();
+				}
+				else
+				{
+					subjectKey = CmapUtil.URN_UUID + statement.getSubject().getId().getBlankNodeId().getLabelString();
+				}
 
 				String vizKey = subjectKey.replace(CmapUtil.URN_UUID, VizUtil.AFV_PREFIX);
 				if (model.containsResource(ResourceFactory.createResource(vizKey)))
@@ -165,8 +202,8 @@ public class Turtle2CmapConverter
 						String linkKey = instanceStatement.getPredicate().asResource().toString();
 
 						Set<LinkedConcept> linkedConcepts = createOrRetrieveSetOfLinkedConcepts(linkId2LinkedConcepts, linkKey);
-						LinkedConcept linkedConcept = new LinkedConcept(statement.getSubject().toString(),
-								instanceStatement.getObject().asResource().toString());
+						String targetSubjectKey = instanceStatement.getObject().asResource().toString();
+						LinkedConcept linkedConcept = new LinkedConcept(subjectKey, targetSubjectKey);
 						linkedConcepts.add(linkedConcept);
 						linkId2LinkedConcepts.put(linkKey, linkedConcepts);
 
@@ -176,7 +213,32 @@ public class Turtle2CmapConverter
 
 						linkId2UiProperties.put(linkKey, linkProperties);
 
-						String targetSubjectKey = instanceStatement.getObject().asResource().toString();
+						Map<String, String> targetConceptProperties = CmapUtil.createOrRetrieveMapOfUiProperties(conceptId2UiProperties, targetSubjectKey);
+						targetConceptProperties = createTitle(model, instanceStatement.getObject().asResource(), targetConceptProperties);
+						targetConceptProperties = createShortComment(model, instanceStatement.getObject().asResource(), targetConceptProperties);
+
+						conceptId2UiProperties.put(targetSubjectKey, targetConceptProperties);
+
+						singleConceptModel.add(instanceStatement);
+					}
+					else if (instanceStatement.getObject().isAnon()
+							&& allNodeIdsOfInstanceGraph.contains(instanceStatement.getResource().getId().getBlankNodeId().getLabelString()))
+					{
+						String linkKey = instanceStatement.getPredicate().asResource().toString();
+
+						Set<LinkedConcept> linkedConcepts = createOrRetrieveSetOfLinkedConcepts(linkId2LinkedConcepts, linkKey);
+						String targetSubjectKey = CmapUtil.URN_UUID + instanceStatement.getResource().getId().getBlankNodeId().getLabelString();
+						LinkedConcept linkedConcept = new LinkedConcept(subjectKey, targetSubjectKey);
+
+						linkedConcepts.add(linkedConcept);
+						linkId2LinkedConcepts.put(linkKey, linkedConcepts);
+
+						Map<String, String> linkProperties = CmapUtil.createOrRetrieveMapOfUiProperties(linkId2UiProperties, linkKey);
+						linkProperties = createLinkTitle(model, instanceStatement.getPredicate().asResource(), linkProperties);
+						linkProperties = createLinkShortComment(model, instanceStatement.getPredicate().asResource(), linkProperties);
+
+						linkId2UiProperties.put(linkKey, linkProperties);
+
 						Map<String, String> targetConceptProperties = CmapUtil.createOrRetrieveMapOfUiProperties(conceptId2UiProperties, targetSubjectKey);
 						targetConceptProperties = createTitle(model, instanceStatement.getObject().asResource(), targetConceptProperties);
 						targetConceptProperties = createShortComment(model, instanceStatement.getObject().asResource(), targetConceptProperties);
@@ -356,9 +418,742 @@ public class Turtle2CmapConverter
 
 		model = visualizationInfoBuilderResult.getModel();
 
+		if (RdfCmap.visualizeLiterals)
+		{
+			model = addLiteralNodesForVisualization(model);
+			model = addSelectedNodesForVisualization(model);
+		}
+
+		if (RdfCmap.optimizeLayout)
+		{
+			model = Layouter.optimizeLayout(model);
+		}
+
 		CxlWriter.generateCxlFromRdfModel(pathToInputFile, model);
 
 		log.info(model.listStatements().toList().size() + " triples total after processing.");
+	}
+
+	private Model addLiteralNodesForVisualization(Model model)
+	{
+		for (Iterator<String> iterator = allNodeIdsOfInstanceGraph.iterator(); iterator.hasNext();)
+		{
+			String nodeId = iterator.next();
+			Resource resource;
+			if (nodeId.startsWith(CmapUtil.URN_UUID))
+			{
+				resource = model.createResource(nodeId);
+			}
+			else
+			{
+				resource = model.createResource(new AnonId(new BlankNodeId(nodeId)));
+			}
+
+			StmtIterator stmtIterator = model.listStatements(resource, (Property) null, (RDFNode) null);
+			while (stmtIterator.hasNext())
+			{
+				Statement statement = stmtIterator.next();
+				if (!statement.getObject().isLiteral())
+				{
+					continue;
+				}
+
+				Property predicate = statement.getPredicate();
+
+				if (isLiteralPropertyToSkip(predicate))
+				{
+					continue;
+				}
+
+				// add literal node
+				String title = statement.getLiteral().getLexicalForm();
+				String dataTypeName = statement.getLiteral().getDatatypeURI().replaceAll(AFOUtil.XSD_PREFIX, "xsd:");
+				title = "\"" + title + "\"^^" + dataTypeName;
+				String id = UUID.randomUUID().toString();
+				Resource concept = model.createResource(CmapUtil.URN_UUID + id);
+				Resource uiConcept = model.createResource(VizUtil.AFV_PREFIX + id);
+				model = CmapUtil.createOrUpdateRelatedResource(model, uiConcept, AFOUtil.AFX_HAS_OBJECT, concept);
+				model = CmapUtil.createOrUpdateLiteralValue(model, uiConcept, VizUtil.AFV_IDENTIFIER, id);
+				log.debug("Added literal concept with title: " + ((title == null || title.isEmpty()) ? "<unknown>" : "\"" + title + "\"") + " new ID: "
+						+ uiConcept.getURI());
+				model = CmapUtil.createOrUpdateRelatedResource(model, uiConcept, AFOUtil.RDF_TYPE, VizUtil.AFV_CONCEPT);
+				model = CmapUtil.createOrUpdateLiteralValue(model, uiConcept, AFOUtil.DCT_IDENTIFIER, uiConcept.getURI());
+				model = CmapUtil.createOrUpdateLiteralValue(model, uiConcept, AFOUtil.DCT_TITLE, title);
+				Resource map = model.listStatements((Resource) null, AFOUtil.RDF_TYPE, VizUtil.AFV_MAP).next().getSubject();
+				uiConcept.addProperty(VizUtil.AFV_HAS_MAP, map);
+				model = CmapUtil.createOrUpdateLiteralValue(model, uiConcept, VizUtil.AFV_SHORT_COMMENT, "literal value");
+				model = CmapUtil.createOrUpdateLiteralValue(model, uiConcept, VizUtil.AFV_LONG_COMMENT, "");
+				model = CmapUtil.createOrUpdateLiteralValue(model, uiConcept, VizUtil.AFV_HAS_PARENT_ID, nodeId);
+				model = CmapUtil.createOrUpdateLiteralValue(model, uiConcept, VizUtil.AFV_IS_LITERAL_NODE, "true");
+				model = CmapUtil.createOrUpdateLiteralValue(model, concept, VizUtil.AFV_IS_LITERAL_NODE, "true");
+
+				Resource uiResource;
+				if (resource.isAnon())
+				{
+					uiResource = model.createResource(VizUtil.AFV_PREFIX + nodeId);
+				}
+				else
+				{
+					uiResource = model.createResource(nodeId.replaceAll(CmapUtil.URN_UUID, VizUtil.AFV_PREFIX));
+				}
+
+				Long x = uiResource.getProperty(VizUtil.AFV_X_POSITION).getLong();
+				Long y = uiResource.getProperty(VizUtil.AFV_Y_POSITION).getLong();
+				x = x + 200;
+				y = y + 200;
+				model = CmapUtil.createOrUpdateLiteralValue(model, uiConcept, VizUtil.AFV_X_POSITION, x.toString());
+				model = CmapUtil.createOrUpdateLiteralValue(model, uiConcept, VizUtil.AFV_Y_POSITION, y.toString());
+				model = CmapUtil.createOrUpdateLiteralValue(model, uiConcept, VizUtil.AFV_WIDTH, "100");
+				model = CmapUtil.createOrUpdateLiteralValue(model, uiConcept, VizUtil.AFV_HEIGHT, "25");
+				model = CmapUtil.createOrUpdateLiteralValueOfRelatedResource(model, uiConcept, VizUtil.AFV_HAS_FONT, VizUtil.AFV_FONT, VizUtil.AFV_STYLE,
+						"plain");
+				model = CmapUtil.createOrUpdateLiteralValueOfRelatedResource(model, uiConcept, VizUtil.AFV_HAS_FONT, VizUtil.AFV_FONT, VizUtil.AFV_SIZE, "12");
+				model = CmapUtil.createOrUpdateLiteralValueOfRelatedResource(model, uiConcept, VizUtil.AFV_HAS_BORDER, VizUtil.AFV_BORDER, VizUtil.AFV_SHAPE,
+						"rectangle");
+				model = CmapUtil.createOrUpdateLiteralValueOfRelatedResource(model, uiConcept, VizUtil.AFV_HAS_BORDER, VizUtil.AFV_BORDER, VizUtil.AFV_STYLE,
+						"solid");
+				model = CmapUtil.createOrUpdateLiteralValueOfRelatedResource(model, uiConcept, VizUtil.AFV_HAS_BORDER, VizUtil.AFV_BORDER, VizUtil.AFV_COLOR,
+						"240,240,240,0");
+				model = CmapUtil.createOrUpdateLiteralValue(model, uiConcept, VizUtil.AFV_BACKGROUND_COLOR, "240,240,240,0");
+				model = CmapUtil.createOrUpdateLiteralValue(model, uiConcept, VizUtil.AFV_SHADOW_COLOR, "none");
+
+				// add link to literal node
+				Map<String, String> properties = createTitle(model, predicate, new HashMap<String, String>());
+				String propertyTitle = properties.get(ConceptProperty.TITLE.name());
+				propertyTitle = addPrefix(propertyTitle, predicate);
+				String linkId = UUID.randomUUID().toString();
+				Resource link = model.createResource(CmapUtil.URN_UUID + linkId);
+				Resource uiLink = model.createResource(VizUtil.AFV_PREFIX + linkId);
+				model = CmapUtil.createOrUpdateRelatedResource(model, uiLink, AFOUtil.AFX_HAS_OBJECT, link);
+				model = CmapUtil.createOrUpdateRelatedResource(model, link, AFOUtil.RDF_TYPE, AFOUtil.OWL_DATATYPE_PROPERTY);
+				model = CmapUtil.createOrUpdateLiteralValue(model, uiLink, VizUtil.AFV_IDENTIFIER, linkId);
+				log.debug("Added literal link with title: " + ((propertyTitle == null || propertyTitle.isEmpty()) ? "<unknown>" : "\"" + propertyTitle + "\"")
+						+ " new ID: " + uiLink.getURI());
+				model = CmapUtil.createOrUpdateRelatedResource(model, uiLink, AFOUtil.RDF_TYPE, VizUtil.AFV_LINK);
+				model = CmapUtil.createOrUpdateLiteralValue(model, uiLink, AFOUtil.DCT_IDENTIFIER, uiLink.getURI());
+				model = CmapUtil.createOrUpdateLiteralValue(model, uiLink, AFOUtil.DCT_TITLE, propertyTitle);
+				uiLink.addProperty(VizUtil.AFV_HAS_MAP, map);
+				model = CmapUtil.createOrUpdateLiteralValue(model, uiLink, VizUtil.AFV_SHORT_COMMENT, "datatype property");
+				model = CmapUtil.createOrUpdateLiteralValue(model, uiLink, VizUtil.AFV_LONG_COMMENT, "");
+				model = CmapUtil.createOrUpdateLiteralValue(model, uiLink, VizUtil.AFV_HAS_PARENT_ID, nodeId);
+				x = x - 100;
+				y = y - 100;
+				model = CmapUtil.createOrUpdateLiteralValue(model, uiLink, VizUtil.AFV_X_POSITION, x.toString());
+				model = CmapUtil.createOrUpdateLiteralValue(model, uiLink, VizUtil.AFV_Y_POSITION, y.toString());
+				model = CmapUtil.createOrUpdateLiteralValue(model, uiLink, VizUtil.AFV_WIDTH, "100");
+				model = CmapUtil.createOrUpdateLiteralValue(model, uiLink, VizUtil.AFV_HEIGHT, "15");
+				model = CmapUtil.createOrUpdateLiteralValue(model, uiLink, VizUtil.AFV_MINIMUM_WIDTH, "2");
+				model = CmapUtil.createOrUpdateLiteralValue(model, uiLink, VizUtil.AFV_MINIMUM_HEIGHT, "11");
+				model = CmapUtil.createOrUpdateLiteralValue(model, uiLink, VizUtil.AFV_BACKGROUND_COLOR, "240,240,240,0");
+				model = CmapUtil.createOrUpdateLiteralValueOfRelatedResource(model, uiLink, VizUtil.AFV_HAS_BORDER, VizUtil.AFV_BORDER, VizUtil.AFV_COLOR,
+						"240,240,240,0");
+				model = CmapUtil.createOrUpdateLiteralValueOfRelatedResource(model, uiLink, VizUtil.AFV_HAS_FONT, VizUtil.AFV_FONT, VizUtil.AFV_SIZE, "9");
+				model = CmapUtil.createOrUpdateLiteralValueOfRelatedResource(model, uiLink, VizUtil.AFV_HAS_FONT, VizUtil.AFV_FONT, VizUtil.AFV_COLOR,
+						"0,0,0,255");
+				model = CmapUtil.createOrUpdateLiteralValue(model, uiLink, VizUtil.AFV_SHADOW_COLOR, "none");
+
+				// add connection from resource to link
+				String connectionId = UUID.randomUUID().toString();
+				Resource connection = model.createResource(CmapUtil.URN_UUID + connectionId);
+				Resource uiConnection = model.createResource(VizUtil.AFV_PREFIX + connectionId);
+				model = CmapUtil.createOrUpdateRelatedResource(model, uiConnection, AFOUtil.AFX_HAS_OBJECT, connection);
+				model = CmapUtil.createOrUpdateRelatedResource(model, connection, AFOUtil.RDF_TYPE, AFOUtil.OWL_DATATYPE_PROPERTY);
+				model = CmapUtil.createOrUpdateLiteralValue(model, uiConnection, VizUtil.AFV_IDENTIFIER, connectionId);
+				log.debug("Added new literal connection for new ID: " + connectionId);
+				model = CmapUtil.createOrUpdateRelatedResource(model, uiConnection, AFOUtil.RDF_TYPE, VizUtil.AFV_CONNECTION);
+				model = CmapUtil.createOrUpdateLiteralValue(model, uiConnection, AFOUtil.DCT_IDENTIFIER, uiConnection.getURI());
+				uiConnection.addProperty(VizUtil.AFV_HAS_MAP, map);
+				Resource from = uiResource;
+				Resource to = uiLink;
+				model = CmapUtil.createOrUpdateRelatedResource(model, uiConnection, VizUtil.AFV_CONNECTS_FROM, from);
+				model = CmapUtil.createOrUpdateRelatedResource(model, uiConnection, VizUtil.AFV_CONNECTS_TO, to);
+				model = CmapUtil.createOrUpdateLiteralValue(model, uiConnection, VizUtil.AFV_ANCHOR_FROM, "center");
+				model = CmapUtil.createOrUpdateLiteralValue(model, uiConnection, VizUtil.AFV_ANCHOR_TO, "center");
+				model = CmapUtil.createOrUpdateLiteralValue(model, uiConnection, VizUtil.AFV_LINE_TYPE, "straight");
+				model = CmapUtil.createOrUpdateLiteralValue(model, uiConnection, VizUtil.AFV_ARROW_HEAD, "if-to-concept");
+
+				// add connection from link to literal node
+				connectionId = UUID.randomUUID().toString();
+				connection = model.createResource(CmapUtil.URN_UUID + connectionId);
+				uiConnection = model.createResource(VizUtil.AFV_PREFIX + connectionId);
+				model = CmapUtil.createOrUpdateRelatedResource(model, uiConnection, AFOUtil.AFX_HAS_OBJECT, connection);
+				model = CmapUtil.createOrUpdateRelatedResource(model, connection, AFOUtil.RDF_TYPE, AFOUtil.OWL_DATATYPE_PROPERTY);
+				model = CmapUtil.createOrUpdateLiteralValue(model, uiConnection, VizUtil.AFV_IDENTIFIER, connectionId);
+				log.debug("Added new literal connection for new ID: " + connectionId);
+				model = CmapUtil.createOrUpdateRelatedResource(model, uiConnection, AFOUtil.RDF_TYPE, VizUtil.AFV_CONNECTION);
+				model = CmapUtil.createOrUpdateLiteralValue(model, uiConnection, AFOUtil.DCT_IDENTIFIER, uiConnection.getURI());
+				uiConnection.addProperty(VizUtil.AFV_HAS_MAP, map);
+				from = uiLink;
+				to = uiConcept;
+				model = CmapUtil.createOrUpdateRelatedResource(model, uiConnection, VizUtil.AFV_CONNECTS_FROM, from);
+				model = CmapUtil.createOrUpdateRelatedResource(model, uiConnection, VizUtil.AFV_CONNECTS_TO, to);
+				model = CmapUtil.createOrUpdateLiteralValue(model, uiConnection, VizUtil.AFV_ANCHOR_FROM, "center");
+				model = CmapUtil.createOrUpdateLiteralValue(model, uiConnection, VizUtil.AFV_ANCHOR_TO, "center");
+				model = CmapUtil.createOrUpdateLiteralValue(model, uiConnection, VizUtil.AFV_LINE_TYPE, "straight");
+				model = CmapUtil.createOrUpdateLiteralValue(model, uiConnection, VizUtil.AFV_ARROW_HEAD, "if-to-concept");
+			}
+		}
+		return model;
+	}
+
+	private Model addSelectedNodesForVisualization(Model model)
+	{
+		for (Iterator<String> iterator = allNodeIdsOfInstanceGraph.iterator(); iterator.hasNext();)
+		{
+			String nodeId = iterator.next();
+			Resource resource;
+			if (nodeId.startsWith(CmapUtil.URN_UUID))
+			{
+				resource = model.createResource(nodeId);
+			}
+			else
+			{
+				resource = model.createResource(new AnonId(new BlankNodeId(nodeId)));
+			}
+
+			StmtIterator stmtIterator = model.listStatements(resource, (Property) null, (RDFNode) null);
+			while (stmtIterator.hasNext())
+			{
+				Statement statement = stmtIterator.next();
+				if (statement.getObject().isLiteral())
+				{
+					continue;
+				}
+
+				Property predicate = statement.getPredicate();
+
+				if (!isSelectedProperty(predicate))
+				{
+					continue;
+				}
+
+				Resource object = statement.getResource();
+
+				// add selected node
+				Map<String, String> properties = createTitle(model, object, new HashMap<String, String>());
+				String title = properties.get(ConceptProperty.TITLE.name());
+				title = addPrefix(title, predicate);
+				String id = UUID.randomUUID().toString();
+				Resource concept = model.createResource(CmapUtil.URN_UUID + id);
+				Resource uiConcept = model.createResource(VizUtil.AFV_PREFIX + id);
+				model = CmapUtil.createOrUpdateRelatedResource(model, uiConcept, AFOUtil.AFX_HAS_OBJECT, concept);
+				model = CmapUtil.createOrUpdateLiteralValue(model, uiConcept, VizUtil.AFV_IDENTIFIER, id);
+				log.debug("Added selected concept with title: " + ((title == null || title.isEmpty()) ? "<unknown>" : "\"" + title + "\"") + " new ID: "
+						+ uiConcept.getURI());
+				model = CmapUtil.createOrUpdateRelatedResource(model, uiConcept, AFOUtil.RDF_TYPE, VizUtil.AFV_CONCEPT);
+				model = CmapUtil.createOrUpdateLiteralValue(model, uiConcept, AFOUtil.DCT_IDENTIFIER, uiConcept.getURI());
+				model = CmapUtil.createOrUpdateLiteralValue(model, uiConcept, AFOUtil.DCT_TITLE, title);
+				Resource map = model.listStatements((Resource) null, AFOUtil.RDF_TYPE, VizUtil.AFV_MAP).next().getSubject();
+				uiConcept.addProperty(VizUtil.AFV_HAS_MAP, map);
+				model = CmapUtil.createOrUpdateLiteralValue(model, uiConcept, VizUtil.AFV_SHORT_COMMENT, "selected concept");
+				model = CmapUtil.createOrUpdateLiteralValue(model, uiConcept, VizUtil.AFV_LONG_COMMENT, "");
+				model = CmapUtil.createOrUpdateLiteralValue(model, uiConcept, VizUtil.AFV_HAS_PARENT_ID, nodeId);
+				model = CmapUtil.createOrUpdateLiteralValue(model, uiConcept, VizUtil.AFV_IS_NAMED_INDIVIDUAL_OF_ONTOLOGIES, "true");
+				model = CmapUtil.createOrUpdateLiteralValue(model, concept, VizUtil.AFV_IS_NAMED_INDIVIDUAL_OF_ONTOLOGIES, "true");
+
+				Resource uiResource;
+				if (resource.isAnon())
+				{
+					uiResource = model.createResource(VizUtil.AFV_PREFIX + nodeId);
+				}
+				else
+				{
+					uiResource = model.createResource(nodeId.replaceAll(CmapUtil.URN_UUID, VizUtil.AFV_PREFIX));
+				}
+
+				Long x = uiResource.getProperty(VizUtil.AFV_X_POSITION).getLong();
+				Long y = uiResource.getProperty(VizUtil.AFV_Y_POSITION).getLong();
+				x = x + 200;
+				y = y - 200;
+				model = CmapUtil.createOrUpdateLiteralValue(model, uiConcept, VizUtil.AFV_X_POSITION, x.toString());
+				model = CmapUtil.createOrUpdateLiteralValue(model, uiConcept, VizUtil.AFV_Y_POSITION, y.toString());
+				model = CmapUtil.createOrUpdateLiteralValue(model, uiConcept, VizUtil.AFV_WIDTH, "100");
+				model = CmapUtil.createOrUpdateLiteralValue(model, uiConcept, VizUtil.AFV_HEIGHT, "25");
+				model = CmapUtil.createOrUpdateLiteralValueOfRelatedResource(model, uiConcept, VizUtil.AFV_HAS_FONT, VizUtil.AFV_FONT, VizUtil.AFV_STYLE,
+						"plain");
+				model = CmapUtil.createOrUpdateLiteralValueOfRelatedResource(model, uiConcept, VizUtil.AFV_HAS_FONT, VizUtil.AFV_FONT, VizUtil.AFV_SIZE, "12");
+				model = CmapUtil.createOrUpdateLiteralValueOfRelatedResource(model, uiConcept, VizUtil.AFV_HAS_BORDER, VizUtil.AFV_BORDER, VizUtil.AFV_SHAPE,
+						"rounded-rectangle");
+				model = CmapUtil.createOrUpdateLiteralValueOfRelatedResource(model, uiConcept, VizUtil.AFV_HAS_BORDER, VizUtil.AFV_BORDER, VizUtil.AFV_STYLE,
+						"solid");
+				model = CmapUtil.createOrUpdateLiteralValue(model, uiConcept, VizUtil.AFV_BACKGROUND_COLOR, "240,240,240,0");
+				model = CmapUtil.createOrUpdateLiteralValue(model, uiConcept, VizUtil.AFV_SHADOW_COLOR, "none");
+
+				// add link to literal node
+				properties = createTitle(model, predicate, new HashMap<String, String>());
+				String propertyTitle = properties.get(ConceptProperty.TITLE.name());
+				propertyTitle = addPrefix(propertyTitle, predicate);
+				String linkId = UUID.randomUUID().toString();
+				Resource link = model.createResource(CmapUtil.URN_UUID + linkId);
+				Resource uiLink = model.createResource(VizUtil.AFV_PREFIX + linkId);
+				model = CmapUtil.createOrUpdateRelatedResource(model, uiLink, AFOUtil.AFX_HAS_OBJECT, link);
+				model = CmapUtil.createOrUpdateRelatedResource(model, link, AFOUtil.RDF_TYPE, AFOUtil.OWL_OBJECT_PROPERTY);
+				model = CmapUtil.createOrUpdateLiteralValue(model, uiLink, VizUtil.AFV_IDENTIFIER, linkId);
+				log.debug("Added selected link with title: " + ((propertyTitle == null || propertyTitle.isEmpty()) ? "<unknown>" : "\"" + propertyTitle + "\"")
+						+ " new ID: " + uiLink.getURI());
+				model = CmapUtil.createOrUpdateRelatedResource(model, uiLink, AFOUtil.RDF_TYPE, VizUtil.AFV_LINK);
+				model = CmapUtil.createOrUpdateLiteralValue(model, uiLink, AFOUtil.DCT_IDENTIFIER, uiLink.getURI());
+				model = CmapUtil.createOrUpdateLiteralValue(model, uiLink, AFOUtil.DCT_TITLE, propertyTitle);
+				uiLink.addProperty(VizUtil.AFV_HAS_MAP, map);
+				model = CmapUtil.createOrUpdateLiteralValue(model, uiLink, VizUtil.AFV_SHORT_COMMENT, "object property");
+				model = CmapUtil.createOrUpdateLiteralValue(model, uiLink, VizUtil.AFV_LONG_COMMENT, "");
+				model = CmapUtil.createOrUpdateLiteralValue(model, uiLink, VizUtil.AFV_HAS_PARENT_ID, nodeId);
+				x = x - 100;
+				y = y + 100;
+				model = CmapUtil.createOrUpdateLiteralValue(model, uiLink, VizUtil.AFV_X_POSITION, x.toString());
+				model = CmapUtil.createOrUpdateLiteralValue(model, uiLink, VizUtil.AFV_Y_POSITION, y.toString());
+				model = CmapUtil.createOrUpdateLiteralValue(model, uiLink, VizUtil.AFV_WIDTH, "100");
+				model = CmapUtil.createOrUpdateLiteralValue(model, uiLink, VizUtil.AFV_HEIGHT, "15");
+				model = CmapUtil.createOrUpdateLiteralValue(model, uiLink, VizUtil.AFV_MINIMUM_WIDTH, "2");
+				model = CmapUtil.createOrUpdateLiteralValue(model, uiLink, VizUtil.AFV_MINIMUM_HEIGHT, "11");
+				model = CmapUtil.createOrUpdateLiteralValue(model, uiLink, VizUtil.AFV_BACKGROUND_COLOR, "240,240,240,0");
+				model = CmapUtil.createOrUpdateLiteralValueOfRelatedResource(model, uiLink, VizUtil.AFV_HAS_BORDER, VizUtil.AFV_BORDER, VizUtil.AFV_COLOR,
+						"240,240,240,0");
+				model = CmapUtil.createOrUpdateLiteralValueOfRelatedResource(model, uiLink, VizUtil.AFV_HAS_FONT, VizUtil.AFV_FONT, VizUtil.AFV_SIZE, "9");
+				model = CmapUtil.createOrUpdateLiteralValueOfRelatedResource(model, uiLink, VizUtil.AFV_HAS_FONT, VizUtil.AFV_FONT, VizUtil.AFV_COLOR,
+						"0,0,0,255");
+				model = CmapUtil.createOrUpdateLiteralValue(model, uiLink, VizUtil.AFV_SHADOW_COLOR, "none");
+
+				// add connection from resource to link
+				String connectionId = UUID.randomUUID().toString();
+				Resource connection = model.createResource(CmapUtil.URN_UUID + connectionId);
+				Resource uiConnection = model.createResource(VizUtil.AFV_PREFIX + connectionId);
+				model = CmapUtil.createOrUpdateRelatedResource(model, uiConnection, AFOUtil.AFX_HAS_OBJECT, connection);
+				model = CmapUtil.createOrUpdateRelatedResource(model, connection, AFOUtil.RDF_TYPE, AFOUtil.OWL_OBJECT_PROPERTY);
+				model = CmapUtil.createOrUpdateLiteralValue(model, uiConnection, VizUtil.AFV_IDENTIFIER, connectionId);
+				log.debug("Added new selected connection for new ID: " + connectionId);
+				model = CmapUtil.createOrUpdateRelatedResource(model, uiConnection, AFOUtil.RDF_TYPE, VizUtil.AFV_CONNECTION);
+				model = CmapUtil.createOrUpdateLiteralValue(model, uiConnection, AFOUtil.DCT_IDENTIFIER, uiConnection.getURI());
+				uiConnection.addProperty(VizUtil.AFV_HAS_MAP, map);
+				Resource from = uiResource;
+				Resource to = uiLink;
+				model = CmapUtil.createOrUpdateRelatedResource(model, uiConnection, VizUtil.AFV_CONNECTS_FROM, from);
+				model = CmapUtil.createOrUpdateRelatedResource(model, uiConnection, VizUtil.AFV_CONNECTS_TO, to);
+				model = CmapUtil.createOrUpdateLiteralValue(model, uiConnection, VizUtil.AFV_ANCHOR_FROM, "center");
+				model = CmapUtil.createOrUpdateLiteralValue(model, uiConnection, VizUtil.AFV_ANCHOR_TO, "center");
+				model = CmapUtil.createOrUpdateLiteralValue(model, uiConnection, VizUtil.AFV_LINE_TYPE, "straight");
+				model = CmapUtil.createOrUpdateLiteralValue(model, uiConnection, VizUtil.AFV_ARROW_HEAD, "if-to-concept");
+
+				// add connection from link to literal node
+				connectionId = UUID.randomUUID().toString();
+				connection = model.createResource(CmapUtil.URN_UUID + connectionId);
+				uiConnection = model.createResource(VizUtil.AFV_PREFIX + connectionId);
+				model = CmapUtil.createOrUpdateRelatedResource(model, uiConnection, AFOUtil.AFX_HAS_OBJECT, connection);
+				model = CmapUtil.createOrUpdateRelatedResource(model, connection, AFOUtil.RDF_TYPE, AFOUtil.OWL_OBJECT_PROPERTY);
+				model = CmapUtil.createOrUpdateLiteralValue(model, uiConnection, VizUtil.AFV_IDENTIFIER, connectionId);
+				log.debug("Added new selected connection for new ID: " + connectionId);
+				model = CmapUtil.createOrUpdateRelatedResource(model, uiConnection, AFOUtil.RDF_TYPE, VizUtil.AFV_CONNECTION);
+				model = CmapUtil.createOrUpdateLiteralValue(model, uiConnection, AFOUtil.DCT_IDENTIFIER, uiConnection.getURI());
+				uiConnection.addProperty(VizUtil.AFV_HAS_MAP, map);
+				from = uiLink;
+				to = uiConcept;
+				model = CmapUtil.createOrUpdateRelatedResource(model, uiConnection, VizUtil.AFV_CONNECTS_FROM, from);
+				model = CmapUtil.createOrUpdateRelatedResource(model, uiConnection, VizUtil.AFV_CONNECTS_TO, to);
+				model = CmapUtil.createOrUpdateLiteralValue(model, uiConnection, VizUtil.AFV_ANCHOR_FROM, "center");
+				model = CmapUtil.createOrUpdateLiteralValue(model, uiConnection, VizUtil.AFV_ANCHOR_TO, "center");
+				model = CmapUtil.createOrUpdateLiteralValue(model, uiConnection, VizUtil.AFV_LINE_TYPE, "straight");
+				model = CmapUtil.createOrUpdateLiteralValue(model, uiConnection, VizUtil.AFV_ARROW_HEAD, "if-to-concept");
+			}
+		}
+		return model;
+	}
+
+	private boolean isSelectedProperty(Property predicate)
+	{
+		if (AFOUtil.QUDT_UNIT.equals(predicate))
+		{
+			return true;
+		}
+		return false;
+	}
+
+	private boolean isLiteralPropertyToSkip(Property predicate)
+	{
+		if (AFOUtil.DCT_TITLE.equals(predicate))
+		{
+			return true;
+		}
+
+		return false;
+	}
+
+	private Set<String> collectNodeIds(Model model)
+	{
+		log.info("Collecting nodes of instance graph.");
+		Set<String> nodeIds = new HashSet<String>();
+		Set<String> checkedNodeIds = new HashSet<String>();
+		StmtIterator stmtIterator = model.listStatements();
+		while (stmtIterator.hasNext())
+		{
+			Statement statement = stmtIterator.next();
+			Resource subject = statement.getSubject();
+			if (hasAlreadyBeenChecked(subject, nodeIds, checkedNodeIds))
+			{
+				continue;
+			}
+
+			if (subject.isURIResource() && !subject.getURI().startsWith(CmapUtil.URN_UUID))
+			{
+				checkedNodeIds.add(subject.getURI());
+				continue;
+			}
+
+			if (isNodeOfInstanceGraph(subject, model, nodeIds))
+			{
+				if (subject.isURIResource())
+				{
+					nodeIds.add(subject.getURI());
+				}
+				else
+				{
+					nodeIds.add(subject.getId().getBlankNodeId().getLabelString());
+				}
+
+				Map<String, String> properties = createTitle(model, subject, new HashMap<String, String>());
+				log.info("Found node: " + subject.toString() + " of type \"" + properties.get(ConceptProperty.TITLE.name()) + "\"");
+			}
+
+			if (subject.isURIResource())
+			{
+				checkedNodeIds.add(subject.getURI());
+			}
+			else
+			{
+				checkedNodeIds.add(subject.getId().getBlankNodeId().getLabelString());
+			}
+		}
+
+		stmtIterator = model.listStatements();
+		while (stmtIterator.hasNext())
+		{
+			Statement statement = stmtIterator.next();
+			if (statement.getObject().isLiteral())
+			{
+				continue;
+			}
+
+			Resource object = statement.getResource();
+			if (hasAlreadyBeenChecked(object, nodeIds, checkedNodeIds))
+			{
+				continue;
+			}
+
+			if (object.isURIResource() && !object.getURI().startsWith(CmapUtil.URN_UUID))
+			{
+				checkedNodeIds.add(object.getURI());
+				continue;
+			}
+
+			if (isNodeOfInstanceGraph(object, model, nodeIds))
+			{
+				if (object.isURIResource())
+				{
+					nodeIds.add(object.getURI());
+				}
+				else
+				{
+					nodeIds.add(object.getId().getBlankNodeId().getLabelString());
+				}
+
+				Map<String, String> properties = createTitle(model, object, new HashMap<String, String>());
+				log.info("Found node: " + object.toString() + " of type \"" + properties.get(ConceptProperty.TITLE.name()) + "\"");
+			}
+
+			if (object.isURIResource())
+			{
+				checkedNodeIds.add(object.getURI());
+			}
+			else
+			{
+				checkedNodeIds.add(object.getId().getBlankNodeId().getLabelString());
+			}
+		}
+
+		log.info(nodeIds.size() + " nodes found.");
+		return nodeIds;
+	}
+
+	private boolean hasAlreadyBeenChecked(Resource resource, Set<String> nodeIds, Set<String> checkedNodeIds)
+	{
+		if (resource.isURIResource())
+		{
+			if (checkedNodeIds.contains(resource.getURI()))
+			{
+				return true;
+			}
+
+			if (nodeIds.contains(resource.getURI()))
+			{
+				return true;
+			}
+		}
+		else
+		{
+			if (checkedNodeIds.contains(resource.getId().getBlankNodeId().getLabelString()))
+			{
+				return true;
+			}
+
+			if (nodeIds.contains(resource.getId().getBlankNodeId().getLabelString()))
+			{
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	private boolean isNodeOfInstanceGraph(Resource resource, Model model, Set<String> nodeIds)
+	{
+		if (resource.isURIResource() && resource.getURI().startsWith(CmapUtil.URN_UUID))
+		{
+			return true;
+		}
+
+		if (resource.isURIResource())
+		{
+			return false;
+		}
+
+		if (isBlankNodeWithConnectionToInstanceGraph(resource, model, nodeIds))
+		{
+			return true;
+		}
+
+		return false;
+	}
+
+	/**
+	 * Check if a resource is connected via object properties to at least one named resource (urn:uuid:...)
+	 *
+	 * @param resource
+	 * @param model
+	 * @param nodeIds
+	 *            TODO
+	 * @return
+	 */
+	private boolean isBlankNodeWithConnectionToInstanceGraph(Resource resource, Model model, Set<String> nodeIds)
+	{
+		if (resource.isURIResource() || resource.isLiteral())
+		{
+			return false;
+		}
+
+		if (resource.hasProperty(AFOUtil.RDF_TYPE))
+		{
+			if (AFOUtil.OWL_RESTRICTION.equals(resource.getPropertyResourceValue(AFOUtil.RDF_TYPE)))
+			{
+				return false;
+			}
+			if (AFOUtil.OWL_CLASS.equals(resource.getPropertyResourceValue(AFOUtil.RDF_TYPE)))
+			{
+				return false;
+			}
+			if (AFOUtil.OWL_OBJECT_PROPERTY.equals(resource.getPropertyResourceValue(AFOUtil.RDF_TYPE)))
+			{
+				return false;
+			}
+			if (AFOUtil.OWL_DATATYPE_PROPERTY.equals(resource.getPropertyResourceValue(AFOUtil.RDF_TYPE)))
+			{
+				return false;
+			}
+			if (AFOUtil.OWL_ANNOTATION_PROPERTY.equals(resource.getPropertyResourceValue(AFOUtil.RDF_TYPE)))
+			{
+				return false;
+			}
+			if (AFOUtil.OWL_AXIOM.equals(resource.getPropertyResourceValue(AFOUtil.RDF_TYPE)))
+			{
+				return false;
+			}
+			if (AFOUtil.RDFS_DATATYPE.equals(resource.getPropertyResourceValue(AFOUtil.RDF_TYPE)))
+			{
+				return false;
+			}
+			if (AFOUtil.OWL_ALL_DIFFERENT.equals(resource.getPropertyResourceValue(AFOUtil.RDF_TYPE)))
+			{
+				return false;
+			}
+		}
+
+		Map<String, String> properties = createTitle(model, resource, new HashMap<String, String>());
+		String title = properties.get(ConceptProperty.TITLE.name());
+		log.debug("Checking: " + resource.toString() + " " + title);
+
+		Set<String> visited = new HashSet<String>();
+		visited.add(resource.getId().getBlankNodeId().getLabelString());
+		VisitedNodesStruct visitedNodesStruct = new VisitedNodesStruct(visited);
+		visitedNodesStruct = visitNeighboursToFindLinkToNamedResource(resource, model, visitedNodesStruct, nodeIds);
+
+		return visitedNodesStruct.isInstanceNode();
+	}
+
+	private VisitedNodesStruct visitNeighboursToFindLinkToNamedResource(Resource resource, Model model, VisitedNodesStruct visitedNodesStruct,
+			Set<String> nodeIds)
+	{
+		Set<String> visited = visitedNodesStruct.getVisitedNodes();
+
+		StmtIterator stmtIterator = model.listStatements(resource, (Property) null, (RDFNode) null);
+		while (stmtIterator.hasNext())
+		{
+			Statement statement = stmtIterator.next();
+			Property property = statement.getPredicate();
+
+			if (isPropertyToSkip(property))
+			{
+				continue;
+			}
+
+			if (statement.getObject().isLiteral())
+			{
+				continue;
+			}
+
+			Resource object = statement.getResource();
+			if (object.isURIResource())
+			{
+				if (object.getURI().startsWith(CmapUtil.URN_UUID))
+				{
+					visitedNodesStruct.setInstanceNode(true);
+					return visitedNodesStruct;
+				}
+
+				if (nodeIds.contains(object.getURI()))
+				{
+					visitedNodesStruct.setInstanceNode(true);
+					return visitedNodesStruct;
+				}
+
+				if (visited.contains(object.getURI()))
+				{
+					continue;
+				}
+
+				visited.add(object.getURI());
+			}
+			else
+			{
+				if (nodeIds.contains(object.getId().getBlankNodeId().getLabelString()))
+				{
+					visitedNodesStruct.setInstanceNode(true);
+					return visitedNodesStruct;
+				}
+
+				if (visited.contains(object.getId().getBlankNodeId().getLabelString()))
+				{
+					continue;
+				}
+
+				visited.add(object.getId().getBlankNodeId().getLabelString());
+			}
+
+			visitedNodesStruct.setVisitedNodes(visited);
+			visitedNodesStruct = visitNeighboursToFindLinkToNamedResource(object, model, visitedNodesStruct, nodeIds);
+
+			if (visitedNodesStruct.isInstanceNode())
+			{
+				return visitedNodesStruct;
+			}
+		}
+
+		stmtIterator = model.listStatements((Resource) null, (Property) null, resource);
+		while (stmtIterator.hasNext())
+		{
+			Statement statement = stmtIterator.next();
+			Property property = statement.getPredicate();
+
+			if (isPropertyToSkip(property))
+			{
+				continue;
+			}
+
+			Resource subject = statement.getSubject();
+			if (subject.isURIResource())
+			{
+				if (subject.getURI().startsWith(CmapUtil.URN_UUID))
+				{
+					visitedNodesStruct.setInstanceNode(true);
+					return visitedNodesStruct;
+				}
+
+				if (nodeIds.contains(subject.getURI()))
+				{
+					visitedNodesStruct.setInstanceNode(true);
+					return visitedNodesStruct;
+				}
+
+				if (visited.contains(subject.getURI()))
+				{
+					continue;
+				}
+
+				visited.add(subject.getURI());
+			}
+			else
+			{
+				if (nodeIds.contains(subject.getId().getBlankNodeId().getLabelString()))
+				{
+					visitedNodesStruct.setInstanceNode(true);
+					return visitedNodesStruct;
+				}
+
+				if (visited.contains(subject.getId().getBlankNodeId().getLabelString()))
+				{
+					continue;
+				}
+
+				visited.add(subject.getId().getBlankNodeId().getLabelString());
+			}
+
+			visitedNodesStruct.setVisitedNodes(visited);
+			visitedNodesStruct = visitNeighboursToFindLinkToNamedResource(subject, model, visitedNodesStruct, nodeIds);
+
+			if (visitedNodesStruct.isInstanceNode())
+			{
+				return visitedNodesStruct;
+			}
+		}
+
+		return visitedNodesStruct;
+	}
+
+	private boolean isPropertyToSkip(Property property)
+	{
+		if (property.getURI().startsWith(AFOUtil.RDF_PREFIX))
+		{
+			return true;
+		}
+
+		if (property.getURI().startsWith(AFOUtil.OWL_PREFIX))
+		{
+			return true;
+		}
+
+		if (property.equals(AFOUtil.RDFS_SUBCLASS_OF))
+		{
+			return true;
+		}
+
+		if (property.equals(AFOUtil.RDFS_SUBPROPERTY_OF))
+		{
+			return true;
+		}
+
+		if (property.equals(AFOUtil.RDFS_DOMAIN))
+		{
+			return true;
+		}
+
+		if (property.equals(AFOUtil.RDFS_RANGE))
+		{
+			return true;
+		}
+
+		if (property.equals(AFOUtil.RDFS_DATATYPE))
+		{
+			return true;
+		}
+
+		return false;
 	}
 
 	private Map<String, String> createLinkCardinality(Model model, Resource subject, Map<String, String> linkProperties)
@@ -648,16 +1443,19 @@ public class Turtle2CmapConverter
 		if (resource.hasProperty(AFOUtil.SKOS_PREF_LABEL))
 		{
 			String title = model.listStatements(resource, AFOUtil.SKOS_PREF_LABEL, (RDFNode) null).next().getLiteral().toString();
+			title = addPrefix(title, resource);
 			linkProperties.put(ConceptProperty.TITLE.name(), breakString(title, MAX_CHARS));
 		}
 		else if (resource.hasProperty(AFOUtil.DCT_TITLE))
 		{
 			String title = model.listStatements(resource, AFOUtil.DCT_TITLE, (RDFNode) null).next().getLiteral().toString();
+			title = addPrefix(title, resource);
 			linkProperties.put(ConceptProperty.TITLE.name(), breakString(title, MAX_CHARS));
 		}
 		else if (resource.hasProperty(AFOUtil.RDFS_LABEL))
 		{
 			String title = model.listStatements(resource, AFOUtil.RDFS_LABEL, (RDFNode) null).next().getLiteral().toString();
+			title = addPrefix(title, resource);
 			linkProperties.put(ConceptProperty.TITLE.name(), breakString(title, MAX_CHARS));
 		}
 		else
@@ -710,14 +1508,14 @@ public class Turtle2CmapConverter
 		};
 
 		Model singleConceptModel = ModelFactory.createDefaultModel();
-		List<Statement> statements = model.listStatements(resource, (Property) null, (RDFNode) null).toList();
+		Set<Statement> statements = model.listStatements(resource, (Property) null, (RDFNode) null).toSet();
 
 		StmtIterator anonStmtIterator = model.listStatements(resource, (Property) null, (RDFNode) null);
 		while (anonStmtIterator.hasNext())
 		{
 			statements = CmapUtil.addStatementsWithBlankNodes(model, anonStmtIterator.next(), statements);
 		}
-		singleConceptModel.add(statements);
+		singleConceptModel.add(new ArrayList<Statement>(statements));
 
 		singleConceptModel.write(output, "TTL");
 		String singleConceptModelString = output.toString();
@@ -1010,8 +1808,8 @@ public class Turtle2CmapConverter
 
 	private Map<String, String> createShortComment(Model model, Resource resource, Map<String, String> properties)
 	{
-		if (resource.getURI().startsWith(CmapUtil.URN_UUID + "AF") || resource.getURI().startsWith(CmapUtil.URN_UUID + "BFO")
-				|| resource.getURI().startsWith(CmapUtil.URN_UUID + "IAO"))
+		if (resource.isURIResource() && (resource.getURI().startsWith(CmapUtil.URN_UUID + "AF") || resource.getURI().startsWith(CmapUtil.URN_UUID + "BFO")
+				|| resource.getURI().startsWith(CmapUtil.URN_UUID + "IAO")))
 		{
 			// this is a disguised class
 			StringBuilder popupText = new StringBuilder();
@@ -1156,9 +1954,33 @@ public class Turtle2CmapConverter
 				{
 					popupText.append("class prefLabel: \n" + parentTypeLabel + "\n\n");
 				}
+				else
+				{
+					StmtIterator parentTypeRdfsLabelIterator = model.listStatements(parentType, AFOUtil.RDFS_LABEL, (RDFNode) null);
+					while (parentTypeRdfsLabelIterator.hasNext())
+					{
+						parentTypeLabel = parentTypeRdfsLabelIterator.next().getLiteral().getString();
+					}
+					if (!parentTypeLabel.isEmpty())
+					{
+						popupText.append("class prefLabel: \n" + parentTypeLabel + "\n\n");
+					}
+				}
 				if (!parentTypeDefinition.isEmpty())
 				{
 					popupText.append("class definition: \n" + parentTypeDefinition + "\n\n");
+				}
+				else
+				{
+					StmtIterator parentTypeOboDefinitionIterator = model.listStatements(parentType, AFOUtil.OBO_DEFINITION, (RDFNode) null);
+					while (parentTypeOboDefinitionIterator.hasNext())
+					{
+						parentTypeDefinition = parentTypeOboDefinitionIterator.next().getLiteral().getString();
+					}
+					if (!parentTypeDefinition.isEmpty())
+					{
+						popupText.append("class definition: \n" + parentTypeDefinition + "\n\n");
+					}
 				}
 			}
 
@@ -1221,7 +2043,71 @@ public class Turtle2CmapConverter
 
 	public Map<String, String> createTitle(Model model, Resource resource, Map<String, String> properties)
 	{
+		if (resource.isAnon())
+		{
 		if (resource.hasProperty(AFOUtil.DCT_TITLE))
+		{
+			String title = model.listStatements(resource, AFOUtil.DCT_TITLE, (RDFNode) null).next().getLiteral().toString();
+				properties.put(ConceptProperty.TITLE.name(), "[" + title + "]");
+			}
+			else if (resource.hasProperty(AFOUtil.RDF_TYPE))
+			{
+				StmtIterator stmtIterator = model.listStatements(resource, AFOUtil.RDF_TYPE, (RDFNode) null);
+				boolean hasTypeLabel = false;
+				Set<String> titles = new HashSet<String>();
+				while (stmtIterator.hasNext())
+				{
+					String title = "";
+					Statement statement = stmtIterator.next();
+					Resource typeResource = statement.getResource();
+					if (typeResource.hasProperty(AFOUtil.DCT_TITLE))
+					{
+						title = title + " " + model.listStatements(typeResource, AFOUtil.DCT_TITLE, (RDFNode) null).next().getLiteral().toString();
+						title = addPrefix(title, typeResource);
+						hasTypeLabel = true;
+						titles.add(title.trim());
+					}
+					else if (typeResource.hasProperty(AFOUtil.DCT_IDENTIFIER))
+					{
+						title = title + " " + model.listStatements(typeResource, AFOUtil.DCT_IDENTIFIER, (RDFNode) null).next().getLiteral().toString();
+						title = addPrefix(title, typeResource);
+						hasTypeLabel = true;
+						titles.add(title.trim());
+					}
+					else if (typeResource.hasProperty(AFOUtil.RDFS_LABEL))
+					{
+						title = title + " " + model.listStatements(typeResource, AFOUtil.RDFS_LABEL, (RDFNode) null).next().getLiteral().toString();
+						title = addPrefix(title, typeResource);
+						hasTypeLabel = true;
+						titles.add(title.trim());
+					}
+					else if (typeResource.hasProperty(AFOUtil.SKOS_PREF_LABEL))
+					{
+						title = title + " " + model.listStatements(typeResource, AFOUtil.SKOS_PREF_LABEL, (RDFNode) null).next().getLiteral().toString();
+						title = addPrefix(title, typeResource);
+						hasTypeLabel = true;
+						titles.add(title.trim());
+					}
+					else
+					{
+						title = title + " " + typeResource.getLocalName();
+						title = addPrefix(title, typeResource);
+						hasTypeLabel = true;
+						titles.add(title.trim());
+					}
+				}
+
+				if (hasTypeLabel)
+				{
+					properties.put(ConceptProperty.TITLE.name(), "[" + StringUtils.join(titles, ", ") + "]");
+				}
+				else
+				{
+					properties.put(ConceptProperty.TITLE.name(), resource.getId().getBlankNodeId().getLabelString());
+				}
+			}
+		}
+		else if (resource.hasProperty(AFOUtil.DCT_TITLE))
 		{
 			String title = model.listStatements(resource, AFOUtil.DCT_TITLE, (RDFNode) null).next().getLiteral().toString();
 			properties.put(ConceptProperty.TITLE.name(), breakString(title, MAX_CHARS));
@@ -1245,29 +2131,42 @@ public class Turtle2CmapConverter
 		{
 			StmtIterator stmtIterator = model.listStatements(resource, AFOUtil.RDF_TYPE, (RDFNode) null);
 			boolean hasTypeLabel = false;
-			String title = "instance of";
+			Set<String> titles = new HashSet<String>();
 			while (stmtIterator.hasNext())
 			{
+				String title = StringUtils.EMPTY;
 				Statement statement = stmtIterator.next();
 				Resource typeResource = statement.getResource();
-				if (typeResource.hasProperty(AFOUtil.DCT_TITLE))
+				if (typeResource.equals(AFOUtil.OWL_NAMED_INDIVIDUAL))
 				{
-					title = title + " " + model.listStatements(typeResource, AFOUtil.DCT_TITLE, (RDFNode) null).next().getLiteral().toString();
+					continue;
+				}
+				else if (typeResource.hasProperty(AFOUtil.DCT_TITLE))
+				{
+					title = model.listStatements(typeResource, AFOUtil.DCT_TITLE, (RDFNode) null).next().getLiteral().toString();
+					title = addPrefix(title, typeResource);
+					titles.add(title);
 					hasTypeLabel = true;
 				}
 				else if (typeResource.hasProperty(AFOUtil.DCT_IDENTIFIER))
 				{
-					title = title + " " + model.listStatements(typeResource, AFOUtil.DCT_IDENTIFIER, (RDFNode) null).next().getLiteral().toString();
+					title = model.listStatements(typeResource, AFOUtil.DCT_IDENTIFIER, (RDFNode) null).next().getLiteral().toString();
+					title = addPrefix(title, typeResource);
+					titles.add(title);
 					hasTypeLabel = true;
 				}
 				else if (typeResource.hasProperty(AFOUtil.RDFS_LABEL))
 				{
-					title = title + " " + model.listStatements(typeResource, AFOUtil.RDFS_LABEL, (RDFNode) null).next().getLiteral().toString();
+					title = model.listStatements(typeResource, AFOUtil.RDFS_LABEL, (RDFNode) null).next().getLiteral().toString();
+					title = addPrefix(title, typeResource);
+					titles.add(title);
 					hasTypeLabel = true;
 				}
 				else if (typeResource.hasProperty(AFOUtil.SKOS_PREF_LABEL))
 				{
-					title = title + " " + model.listStatements(typeResource, AFOUtil.SKOS_PREF_LABEL, (RDFNode) null).next().getLiteral().toString();
+					title = model.listStatements(typeResource, AFOUtil.SKOS_PREF_LABEL, (RDFNode) null).next().getLiteral().toString();
+					title = addPrefix(title, typeResource);
+					titles.add(title);
 					hasTypeLabel = true;
 				}
 				else if (typeResource.equals(AFOUtil.OWL_CLASS))
@@ -1276,43 +2175,56 @@ public class Turtle2CmapConverter
 					if (resource.hasProperty(AFOUtil.DCT_TITLE))
 					{
 						title = model.listStatements(resource, AFOUtil.DCT_TITLE, (RDFNode) null).next().getLiteral().toString();
+						title = addPrefix(title, resource);
+						titles.add(title);
 						hasTypeLabel = true;
 					}
 					else if (resource.hasProperty(AFOUtil.DCT_IDENTIFIER))
 					{
 						title = model.listStatements(resource, AFOUtil.DCT_IDENTIFIER, (RDFNode) null).next().getLiteral().toString();
+						title = addPrefix(title, resource);
+						titles.add(title);
 						hasTypeLabel = true;
 					}
 					else if (resource.hasProperty(AFOUtil.RDFS_LABEL))
 					{
 						title = model.listStatements(resource, AFOUtil.RDFS_LABEL, (RDFNode) null).next().getLiteral().toString();
+						title = addPrefix(title, resource);
+						titles.add(title);
 						hasTypeLabel = true;
 					}
 					else if (resource.hasProperty(AFOUtil.SKOS_PREF_LABEL))
 					{
 						title = model.listStatements(resource, AFOUtil.SKOS_PREF_LABEL, (RDFNode) null).next().getLiteral().toString();
+						title = addPrefix(title, resource);
+						titles.add(title);
 						hasTypeLabel = true;
 					}
 					else
 					{
 						title = resource.getLocalName();
+						title = addPrefix(title, resource);
+						titles.add(title);
 						hasTypeLabel = true;
 					}
 				}
 				else
 				{
-					title = title + " " + typeResource.getLocalName();
+					title = typeResource.getLocalName();
+					title = addPrefix(title, typeResource);
+					titles.add(title);
 					hasTypeLabel = true;
 				}
 			}
 
 			if (hasTypeLabel)
 			{
-				properties.put(ConceptProperty.TITLE.name(), breakString(title, MAX_CHARS));
+				properties.put(ConceptProperty.TITLE.name(), breakString(StringUtils.join(titles, ", "), MAX_CHARS));
 			}
 			else if (resource.hasProperty(AFOUtil.SKOS_PREF_LABEL))
 			{
-				title = model.listStatements(resource, AFOUtil.SKOS_PREF_LABEL, (RDFNode) null).next().getLiteral().toString();
+				String title = model.listStatements(resource, AFOUtil.SKOS_PREF_LABEL, (RDFNode) null).next().getLiteral().toString();
+				title = addPrefix(title, resource);
 				properties.put(ConceptProperty.TITLE.name(), breakString(title, MAX_CHARS));
 			}
 			else
@@ -1340,6 +2252,7 @@ public class Turtle2CmapConverter
 		else if (resource.hasProperty(AFOUtil.SKOS_PREF_LABEL))
 		{
 			String title = model.listStatements(resource, AFOUtil.SKOS_PREF_LABEL, (RDFNode) null).next().getLiteral().toString();
+			title = addPrefix(title, resource);
 			properties.put(ConceptProperty.TITLE.name(), breakString(title, MAX_CHARS));
 		}
 		else
@@ -1367,12 +2280,34 @@ public class Turtle2CmapConverter
 		return properties;
 	}
 
+	private String addPrefix(String labelString, Resource resource)
+	{
+		if (!resource.isURIResource())
+		{
+			return labelString;
+		}
+		String prefix = RdfUtil.getNamespaceMap().get(resource.getNameSpace());
+		if (prefix != null && !prefix.isEmpty())
+		{
+			if (prefix.equals("obo"))
+			{
+				prefix = Cmap2TurtleConverter.getPrefixForOboTermLabel(resource.getLocalName());
+			}
+			labelString = prefix.trim() + ":" + labelString.trim();
+		}
+		return labelString;
+	}
+
 	private Model addBlankNodes(Model model, Model singleConceptModel, Statement statementWithBlankObject, String iri)
 	{
 		StmtIterator stmtIterator = model.listStatements(statementWithBlankObject.getObject().asResource(), (Property) null, (RDFNode) null);
 		while (stmtIterator.hasNext())
 		{
 			Statement statement = stmtIterator.next();
+			if (singleConceptModel.contains(statement))
+			{
+				continue;
+			}
 			singleConceptModel.add(statement);
 			if (statement.getObject().isAnon() && !statement.getObject().toString().equals(iri))
 			{

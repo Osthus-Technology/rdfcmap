@@ -78,11 +78,43 @@ public class RdfCmap
 
 	public static boolean writeTurtleToCxl = true;
 
+	public static boolean optimizeLayout = false;
+
+	public static int layoutDuration = 10;
+
+	public static boolean isAutoLayout = true;
+
 	private static String inputFileToConvert = StringUtils.EMPTY;
 
 	private static String[] additionalInputFiles = null;
 
+	public static boolean isRadialLayout = false;
+
+	public static boolean isCircleLayout = false;
+
+	public static boolean isGraphVizLayout = false;
+
+	public static boolean adjustLabels = false;
+
+	public static String dotBinary = "dot.exe";
+
+	public static String graphVizAlgoName = "dot";
+
+	public static boolean breakCycles = false;
+
 	public static List<String> userSpecifiedInstanceNamespaces;
+
+	public static boolean layoutLinks = true;
+
+	public static float nodeSize = 0.1f;
+
+	public static String initialLayout = "diagonal";
+
+	public static String overlap = "scalexy";
+
+	public static boolean avoidLinkLinkOverlap = false;
+
+	public static int startseed = 1;
 
 	public static boolean removeBnodes = false;
 
@@ -115,6 +147,8 @@ public class RdfCmap
 	public static boolean useNetworkShapeGraph = true;
 
 	public static boolean includeVocabulary = false;
+
+	public static boolean visualizeLiterals = true;
 
 	/**
 	 * Main method of the CMap to RDF application.
@@ -331,10 +365,34 @@ public class RdfCmap
 		Option shapes = Option.builder("sh").longOpt("shapes").required(false).desc("Create SHACL shapes from model.").build();
 		Option ontology = Option.builder("owl").longOpt("ontology").required(false).desc("Create an ontology based on SHACL shapes derived from the model.")
 				.build();
+		Option optimize = Option.builder("o").longOpt("optimize").required(false).desc("Optimize layout using gephi layout algorithm.").build();
+		Option optimizeTime = Option.builder("t").longOpt("time").required(false).hasArg().desc("Optimize layout for the given number of seconds.").build();
+		Option layouter = Option.builder("a").longOpt("layout").required(false).hasArg()
+				.desc("Use the specified layout as gephi layout algorithm. Possible values: auto, radial, circle, graphviz").build();
+		Option dotBinary = Option.builder("d").longOpt("dot").required(false).hasArg().desc("Specify absolute path to dot.exe for graphviz layouting.").build();
+		Option graphVizAlgo = Option.builder("g").longOpt("graphvizalgo").required(false).hasArg()
+				.desc("Specify rendering algorithm of graphviz e.g. dot, neato, fdp").build();
+		Option adjustLabels = Option.builder("b").longOpt("label").required(false)
+				.desc("Adjust labels according to level in class hierarchy. Top level terms with low level number get printed out with larger size and larger font size.")
+				.build();
+		Option breakcycles = Option.builder("x").longOpt("break").required(false).desc("Break cycles in a cyclic graph for better layout.").build();
 		Option instanceNamespace = Option.builder("n").longOpt("namespace").required(false).hasArgs()
 				.desc("Specify namespaces of instances to visualize. Default is \"urn:uuid:\"").build();
+		Option noLinkLayout = Option.builder("e").longOpt("nolinklayout").required(false)
+				.desc("Exclude links during layouting. Layout is based on concept positions only. Link labels are positioned afterwards at the centers of connected concepts.")
+				.build();
+		Option nodeSize = Option.builder("z").longOpt("nodesize").required(false).hasArg()
+				.desc("Use the given node size for optimizing layout with graphviz. Default: 0.1").build();
 		Option shapeRoot = Option.builder("rt").longOpt("root").required(false).hasArg()
 				.desc("Use the given IRI of instance or class as root node for shapes creation.").build();
+		Option initLayout = Option.builder("y").longOpt("initlayout").required(false).hasArg()
+				.desc("Initial layout as starting point for automatic layout. diagonal, square, blob. Default: diagonal").build();
+		Option overlap = Option.builder("w").longOpt("overlap").required(false).hasArg()
+				.desc("Overlap option for graphviz. true, false, scale. default:scalexy").build();
+		Option linkoverlap = Option.builder("u").longOpt("linkoverlap").required(false)
+				.desc("Avoid overlap between link labels, option for graphviz. Default is only avoiding overlap between links and nodes.").build();
+		Option startseed = Option.builder("m").longOpt("startseed").required(false).hasArg()
+				.desc("Start seeding parameter as option for graphviz. Influences force-directed layout. Integer value, default 1").build();
 		Option removeBNodes = Option.builder().longOpt("removebnodes").required(false)
 				.desc("Replace all blank nodes of the model as named resources with UUIDs.").build();
 		Option ontoNamespace = Option.builder("nsp").longOpt("ontonamespace").required(false).hasArg()
@@ -344,6 +402,8 @@ public class RdfCmap
 				.desc("During ontology creation add specific domain properties as subproperties of AFX if possible.").build();
 		Option dropLongComments = Option.builder("dlc").longOpt("droplongcomments").required(false).desc("Ignore all existing long comments and recreate them.")
 				.build();
+		Option hideLiteralValues = Option.builder("hlv").longOpt("hideliterals").required(false)
+				.desc("Do not show literal values as explicit nodes in visualization.").build();
 
 		Options infoOptions = new Options();
 		infoOptions.addOption(help);
@@ -375,14 +435,28 @@ public class RdfCmap
 		appOptions.addOption(updateCxl);
 		appOptions.addOption(shapes);
 		appOptions.addOption(noTurtle);
+		appOptions.addOption(optimize);
+		appOptions.addOption(optimizeTime);
+		appOptions.addOption(layouter);
+		appOptions.addOption(adjustLabels);
+		appOptions.addOption(dotBinary);
+		appOptions.addOption(graphVizAlgo);
+		appOptions.addOption(breakcycles);
 		appOptions.addOption(instanceNamespace);
+		appOptions.addOption(noLinkLayout);
+		appOptions.addOption(nodeSize);
 		appOptions.addOption(shapeRoot);
+		appOptions.addOption(initLayout);
+		appOptions.addOption(overlap);
+		appOptions.addOption(linkoverlap);
+		appOptions.addOption(startseed);
 		appOptions.addOption(removeBNodes);
 		appOptions.addOption(ontology);
 		appOptions.addOption(ontoNamespace);
 		appOptions.addOption(ontoPrefix);
 		appOptions.addOption(specificProperties);
 		appOptions.addOption(dropLongComments);
+		appOptions.addOption(hideLiteralValues);
 
 		Options allOptions = new Options();
 		allOptions.addOption(help);
@@ -410,14 +484,28 @@ public class RdfCmap
 		allOptions.addOption(version);
 		allOptions.addOption(shapes);
 		allOptions.addOption(noTurtle);
+		allOptions.addOption(optimize);
+		allOptions.addOption(optimizeTime);
+		allOptions.addOption(layouter);
+		allOptions.addOption(adjustLabels);
+		allOptions.addOption(dotBinary);
+		allOptions.addOption(graphVizAlgo);
+		allOptions.addOption(breakcycles);
 		allOptions.addOption(instanceNamespace);
+		allOptions.addOption(noLinkLayout);
+		allOptions.addOption(nodeSize);
 		allOptions.addOption(shapeRoot);
+		allOptions.addOption(initLayout);
+		allOptions.addOption(overlap);
+		allOptions.addOption(linkoverlap);
+		allOptions.addOption(startseed);
 		allOptions.addOption(removeBNodes);
 		allOptions.addOption(ontology);
 		allOptions.addOption(ontoNamespace);
 		allOptions.addOption(ontoPrefix);
 		allOptions.addOption(specificProperties);
 		allOptions.addOption(dropLongComments);
+		allOptions.addOption(hideLiteralValues);
 
 		CommandLine cmd = new DefaultParser().parse(infoOptions, args, true);
 
@@ -580,6 +668,31 @@ public class RdfCmap
 			writeTurtleToCxl = false;
 		}
 
+		if (cmd.hasOption("optimize"))
+		{
+			optimizeLayout = true;
+		}
+
+		if (cmd.hasOption("hideliterals"))
+		{
+			visualizeLiterals = false;
+		}
+
+		if (cmd.hasOption("label"))
+		{
+			RdfCmap.adjustLabels = true;
+		}
+
+		if (cmd.hasOption("time"))
+		{
+			layoutDuration = Integer.valueOf(cmd.getOptionValue("time"));
+		}
+
+		if (cmd.hasOption("nodesize"))
+		{
+			RdfCmap.nodeSize = Float.valueOf(cmd.getOptionValue("nodesize"));
+		}
+
 		if (cmd.hasOption("root"))
 		{
 			RdfCmap.root = null;
@@ -600,9 +713,60 @@ public class RdfCmap
 			}
 		}
 
+		if (cmd.hasOption("layout"))
+		{
+			String value = cmd.getOptionValue("layout").trim().toLowerCase();
+			if (value != null & !value.isEmpty())
+			{
+				if (value.equals("radial"))
+				{
+					RdfCmap.isAutoLayout = false;
+					RdfCmap.isRadialLayout = true;
+				}
+				else if (value.equals("circle"))
+				{
+					RdfCmap.isAutoLayout = false;
+					RdfCmap.isCircleLayout = true;
+				}
+				else if (value.equals("graphviz"))
+				{
+					RdfCmap.isAutoLayout = false;
+					RdfCmap.isGraphVizLayout = true;
+					if (cmd.hasOption("dot"))
+					{
+						RdfCmap.dotBinary = cmd.getOptionValue("dot");
+					}
+					if (cmd.hasOption("graphvizalgo"))
+					{
+						RdfCmap.graphVizAlgoName = cmd.getOptionValue("graphvizalgo").trim().toLowerCase();
+					}
+				}
+			}
+		}
+
+		if (cmd.hasOption("break"))
+		{
+			RdfCmap.breakCycles = true;
+		}
+
+		if (cmd.hasOption("nolinklayout"))
+		{
+			RdfCmap.layoutLinks = false;
+		}
+
 		if (cmd.hasOption("namespace"))
 		{
 			RdfCmap.userSpecifiedInstanceNamespaces = Arrays.asList(cmd.getOptionValues("namespace"));
+		}
+
+		if (cmd.hasOption("initlayout"))
+		{
+			RdfCmap.initialLayout = cmd.getOptionValue("initlayout").trim().toLowerCase();
+		}
+
+		if (cmd.hasOption("overlap"))
+		{
+			RdfCmap.overlap = cmd.getOptionValue("overlap").trim().toLowerCase();
 		}
 
 		if (cmd.hasOption("ontonamespace"))
@@ -618,6 +782,16 @@ public class RdfCmap
 		if (cmd.hasOption("specificproperties"))
 		{
 			RdfCmap.addSpecificProperties = true;
+		}
+
+		if (cmd.hasOption("startseed"))
+		{
+			RdfCmap.startseed = Integer.valueOf(cmd.getOptionValue("startseed").trim().toLowerCase());
+		}
+
+		if (cmd.hasOption("linkoverlap"))
+		{
+			RdfCmap.avoidLinkLinkOverlap = true;
 		}
 
 		if (cmd.hasOption("removebnodes"))

@@ -7,8 +7,9 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
 import javax.xml.bind.JAXBException;
 import javax.xml.parsers.ParserConfigurationException;
@@ -228,9 +229,9 @@ public class OntologyCreator
 						domainProperty.addProperty(propertyStatement.getPredicate(), propertyStatement.getObject());
 						if (propertyStatement.getObject().isAnon())
 						{
-							List<Statement> blankNodeStatements = new ArrayList<>();
+							Set<Statement> blankNodeStatements = new HashSet<Statement>();
 							blankNodeStatements = CmapUtil.addStatementsWithBlankNodes(modelWithShapes, propertyStatement, blankNodeStatements);
-							model.add(blankNodeStatements);
+							model.add(new ArrayList<Statement>(blankNodeStatements));
 						}
 					}
 
@@ -259,9 +260,9 @@ public class OntologyCreator
 					model.add(propertyStatement);
 					if (propertyStatement.getObject().isAnon())
 					{
-						List<Statement> blankNodeStatements = new ArrayList<>();
+						Set<Statement> blankNodeStatements = new HashSet<Statement>();
 						blankNodeStatements = CmapUtil.addStatementsWithBlankNodes(modelWithShapes, propertyStatement, blankNodeStatements);
-						model.add(blankNodeStatements);
+						model.add(new ArrayList<Statement>(blankNodeStatements));
 					}
 				}
 			}
@@ -379,7 +380,7 @@ public class OntologyCreator
 
 	private Model addVocabulary(Model model, Model modelWithShapes)
 	{
-		List<Statement> statementsToAdd = new ArrayList<>();
+		Set<Statement> statementsToAdd = new HashSet<Statement>();
 
 		// add parent classes
 		StmtIterator stmtIterator = model.listStatements((Resource) null, AFOUtil.RDFS_SUBCLASS_OF, (RDFNode) null);
@@ -393,7 +394,7 @@ public class OntologyCreator
 			statementsToAdd = handleNextParent(model, modelWithShapes, statementsToAdd, statement, AFOUtil.RDFS_SUBCLASS_OF);
 		}
 
-		model.add(statementsToAdd);
+		model.add(new ArrayList<Statement>(statementsToAdd));
 		statementsToAdd.clear();
 
 		// add parent properties
@@ -408,7 +409,7 @@ public class OntologyCreator
 			statementsToAdd = handleNextParent(model, modelWithShapes, statementsToAdd, statement, AFOUtil.RDFS_SUBPROPERTY_OF);
 		}
 
-		model.add(statementsToAdd);
+		model.add(new ArrayList<Statement>(statementsToAdd));
 		statementsToAdd.clear();
 
 		int maxLoop = 10;
@@ -416,7 +417,7 @@ public class OntologyCreator
 		statementsToAdd = determineStillMissingVocabulary(model, modelWithShapes, statementsToAdd);
 		while (!statementsToAdd.isEmpty())
 		{
-			model.add(statementsToAdd);
+			model.add(new ArrayList<Statement>(statementsToAdd));
 			statementsToAdd.clear();
 			statementsToAdd = determineStillMissingVocabulary(model, modelWithShapes, statementsToAdd);
 			if (i >= maxLoop)
@@ -430,7 +431,7 @@ public class OntologyCreator
 		return model;
 	}
 
-	private List<Statement> determineStillMissingVocabulary(Model model, Model modelWithShapes, List<Statement> statementsToAdd)
+	private Set<Statement> determineStillMissingVocabulary(Model model, Model modelWithShapes, Set<Statement> statementsToAdd)
 	{
 		StmtIterator stmtIterator = model.listStatements();
 		while (stmtIterator.hasNext())
@@ -475,7 +476,7 @@ public class OntologyCreator
 		return statementsToAdd;
 	}
 
-	private List<Statement> handleNextParent(Model model, Model modelWithShapes, List<Statement> statementsToAdd, Statement nestedStatement,
+	private Set<Statement> handleNextParent(Model model, Model modelWithShapes, Set<Statement> statementsToAdd, Statement nestedStatement,
 			Property linkToParent)
 	{
 		RDFNode nestedObject = nestedStatement.getObject();
@@ -488,7 +489,7 @@ public class OntologyCreator
 				statementsToAdd.add(nestedObjectStatement);
 				if (nestedObjectStatement.getObject().isAnon())
 				{
-					List<Statement> blankNodeStatements = new ArrayList<>();
+					Set<Statement> blankNodeStatements = new HashSet<Statement>();
 					blankNodeStatements = CmapUtil.addStatementsWithBlankNodes(modelWithShapes, nestedObjectStatement, blankNodeStatements);
 					statementsToAdd.addAll(blankNodeStatements);
 				}

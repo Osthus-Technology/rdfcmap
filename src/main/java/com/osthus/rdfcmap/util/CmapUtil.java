@@ -328,16 +328,19 @@ public class CmapUtil
 		return model;
 	}
 
-	public static List<Statement> addStatementsWithBlankNodes(Model otherTriplesModel, Statement statement, List<Statement> statements)
+	public static Set<Statement> addStatementsWithBlankNodes(Model model, Statement statement, Set<Statement> statements)
 	{
 		if (statement.getObject().isAnon())
 		{
-			StmtIterator anonIterator = otherTriplesModel.listStatements(statement.getObject().asResource(), (Property) null, (RDFNode) null);
+			StmtIterator anonIterator = model.listStatements(statement.getObject().asResource(), (Property) null, (RDFNode) null);
 			while (anonIterator.hasNext())
 			{
 				Statement anonStatement = anonIterator.next();
+				if (!statements.contains(anonStatement))
+				{
 				statements.add(anonStatement);
-				statements = addStatementsWithBlankNodes(otherTriplesModel, anonStatement, statements);
+					statements = addStatementsWithBlankNodes(model, anonStatement, statements);
+				}
 			}
 		}
 
@@ -405,9 +408,12 @@ public class CmapUtil
 	{
 		if (additionalFiles != null && additionalFiles.length > 0)
 		{
-			Model visualizationModel = extractVisualizationModel(model);
-			int numTriplesBeforeAddingOtherModels = model.listStatements().toList().size();
-			model.removeAll();
+			Model tempModel = ModelFactory.createDefaultModel();
+			tempModel.add(model);
+
+			Model visualizationModel = extractVisualizationModel(tempModel);
+			int numTriplesBeforeAddingOtherModels = tempModel.listStatements().toList().size();
+			tempModel.removeAll();
 
 			for (int i = 0; i < additionalFiles.length; i++)
 			{
@@ -436,9 +442,9 @@ public class CmapUtil
 				if (additionalModel != null && !additionalModel.isEmpty())
 				{
 					int numTriplesToAdd = additionalModel.listStatements().toList().size();
-					int numTriples = model.listStatements().toList().size();
-					model = model.add(additionalModel);
-					int numTriplesNew = model.listStatements().toList().size();
+					int numTriples = tempModel.listStatements().toList().size();
+					tempModel = tempModel.add(additionalModel);
+					int numTriplesNew = tempModel.listStatements().toList().size();
 					log.info(numTriplesToAdd + " triples found. " + (numTriplesNew - numTriples) + " triples added.");
 				}
 				else
@@ -447,7 +453,8 @@ public class CmapUtil
 				}
 			}
 
-			model.add(visualizationModel);
+			tempModel.add(visualizationModel);
+			model.add(tempModel);
 			int numTriplesAfterAddingOtherModels = model.listStatements().toList().size();
 			int change = numTriplesAfterAddingOtherModels - numTriplesBeforeAddingOtherModels;
 			log.info("Model " + (change > 0 ? "increased " : (change == 0 ? "changed " : "reduced ")) + "by " + change + " triples. ");
@@ -470,7 +477,7 @@ public class CmapUtil
 	private static Model extractVisualizationModel(Model model)
 	{
 		Model tempModel = ModelFactory.createDefaultModel();
-		List<Statement> statementsToAdd = new ArrayList<>();
+		Set<Statement> statementsToAdd = new HashSet<Statement>();
 		StmtIterator stmtIterator = model.listStatements();
 		while (stmtIterator.hasNext())
 		{
@@ -492,7 +499,7 @@ public class CmapUtil
 			}
 		}
 
-		tempModel.add(statementsToAdd);
+		tempModel.add(new ArrayList<Statement>(statementsToAdd));
 		return tempModel;
 	}
 
@@ -719,6 +726,11 @@ public class CmapUtil
 
 	public static String addCardinality(Model model, Resource link, String title)
 	{
+		if (!link.hasProperty(VizUtil.AFV_HAS_CARDINALITY))
+		{
+			return title;
+		}
+
 		Resource cardinalityResource = model.listStatements(link, VizUtil.AFV_HAS_CARDINALITY, (RDFNode) null).next().getResource();
 		Resource cardinalityType = model.listStatements(cardinalityResource, AFOUtil.RDF_TYPE, (RDFNode) null).next().getResource();
 		String minimumValue = cardinalityResource.hasProperty(AFOUtil.AFX_MINIMUM_VALUE)

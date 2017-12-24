@@ -24,15 +24,21 @@ How to create a cmap to be used with rdfcmap?
 8) Export cmap as CXL file
 
 Changelog:
+
+V2.3.1 
+* Improved conversion from ttl to cmap in order to support blank nodes and literal values
+* Improved import of triples
+* Note: Conversion from TTL to CXL requires layouting of concepts in order to get a useful visualization. Enabling automatic layouting with rdfcmap needs additional third-party dependencies. Currently, rdfcmap supports layouting based on graphviz as well as different layout algorithms provided by gephi. Please contact OSTHUS for further information (office(at)osthus(dot)com).  
+
 V2.2.0 
-  Updated conversion from ttl to cmap in order to support BFO aligned models
-  Note: Conversion from TTL to CXL requires layouting of concepts in order to get a useful visualization. Enabling automatic layouting with rdfcmap needs additional third-party dependencies. Currently, rdfcmap supports layouting based on graphviz as well as different layout algorithms provided by gephi. Please contact OSTHUS for further information (office(at)osthus(dot)com).  
+* Updated conversion from ttl to cmap in order to support BFO aligned models
+* Note: Conversion from TTL to CXL requires layouting of concepts in order to get a useful visualization. Enabling automatic layouting with rdfcmap needs additional third-party dependencies. Currently, rdfcmap supports layouting based on graphviz as well as different layout algorithms provided by gephi. Please contact OSTHUS for further information (office(at)osthus(dot)com).  
   
 V2.1.4 
-  Updated conversion from cmap to ttl in order to support BFO aligned models
-  Added SPARQL export
-  Added Shape export
-  Added ADF export
+* Updated conversion from cmap to ttl in order to support BFO aligned models
+* Added SPARQL export
+* Added Shape export
+* Added ADF export
 
 Copyright OSTHUS 2016-2018
 
