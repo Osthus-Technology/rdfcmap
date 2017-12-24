@@ -219,6 +219,7 @@ public class RdfUtil
 
 	public static Model convertBlankNodesToNamedResources(Model model)
 	{
+		log.info("removing blank nodes from data description");
 		Map<String, Resource> id2blankNode = new HashMap<String, Resource>();
 		Map<Resource, String> blankNode2id = new HashMap<Resource, String>();
 		StmtIterator blankStatementIterator = model.listStatements();

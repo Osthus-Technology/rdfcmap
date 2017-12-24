@@ -287,7 +287,7 @@ public class RdfCmap
 			}
 		}
 		else if (inputFileToConvert.toLowerCase().endsWith("ttl") || inputFileToConvert.toLowerCase().endsWith("owl")
-				|| inputFileToConvert.toLowerCase().endsWith("xml"))
+				|| inputFileToConvert.toLowerCase().endsWith("xml") || inputFileToConvert.toLowerCase().endsWith("adf"))
 		{
 			if (!roundtrip)
 			{

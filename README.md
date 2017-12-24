@@ -4,10 +4,15 @@ RDFCMap converts between CMap CXL and RDF TTL.
 Usage to convert from CXL to TTL
 "c:\path\to\jdk8\bin\java" -Dlog4j.configurationFile=resources/log4j2.xml -jar rdf-cmap.jar -i your-input-cmap-model.cxl
 
+Note: Conversion from CXL to TTL supports vocabulary of AFO2.0
+
 Usage to convert from TTL to CXL:
 "c:\path\to\jdk8\bin\java" -Dlog4j.configurationFile=resources/log4j2.xml -jar rdf-cmap.jar -i your-input-rdf-model.ttl
 
-Note: Conversion from CXL to TTL supports vocabulary of AFO2.0
+Usage to visualize data description of ADF as CXL:
+"c:\path\to\jdk8\bin\java" -Dlog4j.configurationFile=resources/log4j2.xml -jar rdf-cmap.jar -i your-input-adf-file.adf
+
+Note: Creation of a useful visualizations of large graphs requires automatic layouting of nodes. Rdfcmap supports layouting based on graphviz as well as different layout algorithms provided by gephi. Please contact OSTHUS for further information (office(at)osthus(dot)com).  
 
 Use --help to see command line options
 "c:\path\to\jdk8\bin\java" -Dlog4j.configurationFile=resources/log4j2.xml -jar rdf-cmap.jar --help
@@ -24,6 +29,10 @@ How to create a cmap to be used with rdfcmap?
 8) Export cmap as CXL file
 
 Changelog:
+
+V2.3.2
+* Create visualization directly from ADF
+* Note: Reading and writing ADF requires presence of ADF-API in build path. Please contact OSTHUS for further support and information (office(at)osthus(dot)com).  
 
 V2.3.1 
 * Improved conversion from ttl to cmap in order to support blank nodes and literal values

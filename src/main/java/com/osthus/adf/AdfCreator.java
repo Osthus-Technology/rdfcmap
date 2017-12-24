@@ -15,6 +15,8 @@ import com.hp.hpl.jena.rdf.model.ModelFactory;
 import com.hp.hpl.jena.rdf.model.Property;
 import com.hp.hpl.jena.rdf.model.RDFNode;
 import com.hp.hpl.jena.rdf.model.Resource;
+import com.hp.hpl.jena.rdf.model.Statement;
+import com.hp.hpl.jena.rdf.model.StmtIterator;
 
 import de.osthus.ambeth.exception.RuntimeExceptionUtil;
 
@@ -43,6 +45,24 @@ public class AdfCreator
 		{
 			throw RuntimeExceptionUtil.mask(e);
 		}
+	}
+
+	public static org.apache.jena.rdf.model.Model read(Path adfPath, org.apache.jena.rdf.model.Model model, Logger log)
+	{
+		log.info("Reading model from ADF " + adfPath.toAbsolutePath().toString());
+		AdfService adfService = AdfServiceFactory.create();
+		try (AdfFile adfFile = adfService.openFile(adfPath))
+		{
+			DataDescription dataDescription = adfFile.getDataDescription();
+			org.apache.jena.rdf.model.Model newModel = readModel(dataDescription);
+			model.add(newModel);
+		}
+		catch (IOException e)
+		{
+			throw RuntimeExceptionUtil.mask(e);
+		}
+
+		return model;
 	}
 
 	/**
@@ -85,6 +105,89 @@ public class AdfCreator
 			else if (object.isAnon())
 			{
 				newObject = newModel.createResource(new AnonId(object.asNode().getBlankNodeId().getLabelString()));
+			}
+			else
+			{
+				String datatypeUri = object.asLiteral().getDatatypeURI();
+				if (datatypeUri.contains("string"))
+				{
+					newObject = newModel.createTypedLiteral(object.asLiteral().getString());
+				}
+				else if (datatypeUri.contains("integer"))
+				{
+					newObject = newModel.createTypedLiteral(object.asLiteral().getInt());
+				}
+				else if (datatypeUri.contains("double"))
+				{
+					newObject = newModel.createTypedLiteral(object.asLiteral().getDouble());
+				}
+				else if (datatypeUri.contains("float"))
+				{
+					newObject = newModel.createTypedLiteral(object.asLiteral().getFloat());
+				}
+				else if (datatypeUri.contains("long"))
+				{
+					newObject = newModel.createTypedLiteral(object.asLiteral().getLong());
+				}
+				else if (datatypeUri.contains("boolean"))
+				{
+					newObject = newModel.createTypedLiteral(object.asLiteral().getBoolean());
+				}
+				else if (datatypeUri.contains("dateTime"))
+				{
+					String literalValue = object.asLiteral().getString();
+					if (literalValue.contains("\"^^"))
+					{
+						String[] segments = literalValue.split("\\^\\^");
+						literalValue = segments[0].substring(1, segments[0].length() - 1); // cut quotes
+					}
+					Object literalValueAsObject = javax.xml.bind.DatatypeConverter.parseDateTime(literalValue);
+					newObject = newModel.createTypedLiteral(literalValueAsObject);
+				}
+				else
+				{
+					newObject = newModel.createTypedLiteral(object.asLiteral().getString());
+				}
+			}
+
+			newModel.add(newSubject, newProperty, newObject);
+		}
+		return newModel;
+	}
+
+	public static org.apache.jena.rdf.model.Model readModel(Model model)
+	{
+		org.apache.jena.rdf.model.Model newModel = org.apache.jena.rdf.model.ModelFactory.createDefaultModel();
+		StmtIterator stmtIterator = model.listStatements();
+		while (stmtIterator.hasNext())
+		{
+			Statement statement = stmtIterator.next();
+			Resource subject = statement.getSubject();
+			Property property = statement.getPredicate();
+			RDFNode object = statement.getObject();
+
+			org.apache.jena.rdf.model.Resource newSubject;
+			org.apache.jena.rdf.model.Property newProperty;
+			org.apache.jena.rdf.model.RDFNode newObject;
+
+			if (subject.isURIResource())
+			{
+				newSubject = newModel.createResource(subject.getURI());
+			}
+			else
+			{
+				newSubject = newModel.createResource(new org.apache.jena.rdf.model.AnonId(subject.asNode().getBlankNodeId().getLabelString()));
+			}
+
+			newProperty = newModel.createProperty(property.getURI());
+
+			if (object.isURIResource())
+			{
+				newObject = newModel.createResource(object.asResource().getURI());
+			}
+			else if (object.isAnon())
+			{
+				newObject = newModel.createResource(new org.apache.jena.rdf.model.AnonId(object.asNode().getBlankNodeId().getLabelString()));
 			}
 			else
 			{

@@ -5,7 +5,6 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -42,6 +41,7 @@ import org.w3c.dom.Document;
 import org.w3c.dom.Node;
 import org.xml.sax.SAXException;
 
+import com.osthus.adf.AdfCreator;
 import com.osthus.rdfcmap.RdfCmap;
 import com.osthus.rdfcmap.cmap.cardinality.Cardinality;
 import com.osthus.rdfcmap.cmap.cardinality.CardinalityEnum;
@@ -936,40 +936,16 @@ public class CmapUtil
 
 	public static Model extractModelFromAdf(Path pathToInputFile, Model model)
 	{
-		ByteArrayOutputStream os = new ByteArrayOutputStream()
-		{
-			private StringBuilder string = new StringBuilder();
-
-			@Override
-			public void write(int b)
-			{
-				string.append((char) b);
-			}
-		};
-		String dataDescriptionAsString = StringUtils.EMPTY;
-
-		// AdfService adfService = AdfServiceFactory.create();
-		//
-		// try (AdfFile adfFile = adfService.openFile(pathToInputFile, true))
-		// {
-		//
-		// ((Model) adfFile.getDataDescription()).write(os, "NTriples");
-		// }
-		// catch (IOException e)
-		// {
-		// throw RuntimeExceptionUtil.mask(e);
-		// }
-
-		dataDescriptionAsString = os.toString(Charset.forName("UTF-8"));
+		model = AdfCreator.read(pathToInputFile, model, log);
 
 		if (RdfCmap.removeBnodes)
+			{
+			model = RdfUtil.convertBlankNodesToNamedResources(model);
+			}
+
+		if (RdfCmap.userSpecifiedInstanceNamespaces != null && !RdfCmap.userSpecifiedInstanceNamespaces.isEmpty())
 		{
-			Model tempModel = ModelFactory.createDefaultModel();
-
-			log.info("removing blank nodes from data description");
-			tempModel.read(new ByteArrayInputStream(dataDescriptionAsString.getBytes(StandardCharsets.UTF_8)), null, "NTriples");
-			tempModel = RdfUtil.convertBlankNodesToNamedResources(tempModel);
-
+			String dataDescriptionAsString = StringUtils.EMPTY;
 			ByteArrayOutputStream output = new ByteArrayOutputStream()
 			{
 				private StringBuilder string = new StringBuilder();
@@ -981,14 +957,14 @@ public class CmapUtil
 				}
 			};
 
-			tempModel.write(output, "NTriples");
+			model.write(output, "NTriples");
 			dataDescriptionAsString = output.toString(StandardCharsets.UTF_8);
-		}
-
 		dataDescriptionAsString = disguiseConceptsForVisualizationAsInstancesWithUrnUuid(dataDescriptionAsString);
 
 		ByteArrayInputStream is = new ByteArrayInputStream(dataDescriptionAsString.getBytes(StandardCharsets.UTF_8));
+			model.removeAll();
 		model.read(is, "NTriples");
+		}
 		return model;
 	}
 
