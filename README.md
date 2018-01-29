@@ -30,6 +30,10 @@ How to create a cmap to be used with rdfcmap?
 
 Changelog:
 
+V2.3.4
+* improved sparql export
+* improved handling of user-specified prefix mapping
+ 
 V2.3.2
 * Create visualization directly from ADF
 * Note: Reading and writing ADF requires presence of ADF-API in build path. Please contact OSTHUS for further support and information (office(at)osthus(dot)com).  
