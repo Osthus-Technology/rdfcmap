@@ -34,7 +34,7 @@ import com.osthus.rdfcmap.cmap.Cmap2TurtleConverter;
 import com.osthus.rdfcmap.helper.PreparedModels;
 import com.osthus.rdfcmap.util.AFOUtil;
 import com.osthus.rdfcmap.util.CmapUtil;
-import com.osthus.rdfcmap.util.RdfUtil;
+import com.osthus.rdfcmap.util.Prefixes;
 import com.osthus.rdfcmap.util.VizUtil;
 
 /**
@@ -131,7 +131,7 @@ public class SparqlCreator
 			throw new IllegalStateException("Missing target node for SPARQL query. Please verify that there exists a resource node with oval, solid border.");
 		}
 
-		sb.append(RdfUtil.getPrefixes() + "\n\n");
+		sb.append(Prefixes.getSparqlPrefixes() + "\n\n");
 		sb.append("select distinct ");
 
 		Set<String> targetPropertyLabels = new LinkedHashSet<String>();
@@ -364,7 +364,7 @@ public class SparqlCreator
 	{
 		String namespace = resource.getNameSpace();
 		String localName = resource.getLocalName();
-		String prefix = RdfUtil.getNamespaceMap().get(namespace);
+		String prefix = Prefixes.getNamespaceMap().get(namespace);
 		if (prefix == null)
 		{
 			if (resource.isAnon())
@@ -390,7 +390,7 @@ public class SparqlCreator
 		else if (prefix.equals("obo"))
 		{
 			String[] segments = resource.getURI().split("_");
-			prefix = RdfUtil.getNamespaceMap().get(segments[0]);
+			prefix = Prefixes.getNamespaceMap().get(segments[0]);
 			return prefix + ":_" + segments[segments.length - 1];
 		}
 		else

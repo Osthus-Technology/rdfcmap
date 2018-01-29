@@ -43,6 +43,7 @@ import com.osthus.rdfcmap.helper.ConceptRelation;
 import com.osthus.rdfcmap.sparql.PathList;
 import com.osthus.rdfcmap.util.AFOUtil;
 import com.osthus.rdfcmap.util.CmapUtil;
+import com.osthus.rdfcmap.util.Prefixes;
 import com.osthus.rdfcmap.util.RdfUtil;
 import com.osthus.rdfcmap.util.VizUtil;
 
@@ -117,7 +118,7 @@ public class ShapesCreator2
 				rootShape.addProperty(AFOUtil.SHACL_TARGET_CLASS, type);
 			}
 
-			shapesModel.setNsPrefixes(AFOUtil.nsPrefixMap);
+			shapesModel.setNsPrefixes(Prefixes.nsPrefixMap);
 			shapesModel.write(System.out, "TTL");
 
 			writeShapes(model, pathToInputFile);

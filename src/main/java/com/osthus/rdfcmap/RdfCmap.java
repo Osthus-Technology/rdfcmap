@@ -42,13 +42,11 @@ import com.osthus.rdfcmap.cmap.shape.ShapesCreator2;
 import com.osthus.rdfcmap.ontology.OntologyCreator;
 import com.osthus.rdfcmap.path.PathFinder;
 import com.osthus.rdfcmap.sparql.SparqlCreator;
-import com.osthus.rdfcmap.util.AFOUtil;
 import com.osthus.rdfcmap.util.CmapUtil;
-import com.osthus.rdfcmap.util.RdfUtil;
+import com.osthus.rdfcmap.util.Prefixes;
 
 /**
- * Main class RDF CMap conversion tool
- * check command line argument --help for available options 
+ * Main class RDF CMap conversion tool check command line argument --help for available options
  *
  * @author Helge Krieg, OSTHUS GmbH
  */
@@ -325,7 +323,7 @@ public class RdfCmap
 		Option input = Option.builder("i").longOpt("input").required(true).hasArg()
 				.desc("Specifies an input file for conversion (either TTL or CXL). Specifying a TTL file will convert to CXL, specifying a CXL file will convert to TTL. Mandatory argument.")
 				.build();
-		Option externalFiles = Option.builder("r").required(false).argName("file-1> <file-2> <...").hasArgs()
+		Option externalFiles = Option.builder("r").longOpt("read").required(false).argName("file-1> <file-2> <...").hasArgs()
 				.desc("Specifies additional files (either TTL or CXL) with triples to be used during conversion. Optional argument. Up to 10 external files.")
 				.build();
 		Option info = Option.builder("?").longOpt("info").required(false).desc("Write out program info.").build();
@@ -354,11 +352,13 @@ public class RdfCmap
 		Option debug = Option.builder("de").longOpt("debug").required(false).desc("Show extended output for debugging purposes.").build();
 		Option color = Option.builder("c").longOpt("color").required(false).desc("Use color scheme of AFT.").build();
 		Option sparql = Option.builder("q").longOpt("sparql").required(false)
-				.desc("Create a sparql query for properties of the selected resource (with oval border).").build();
+				.desc("Create a sparql query for properties of a target node. Target node must have oval shape. Source node must have oval shape with dashed border.")
+				.build();
 		Option updateCxl = Option.builder("u").longOpt("update").required(false).desc("Update visualization directly (roundtrip cxl -> ttl -> cxl).").build();
 		Option version = Option.builder("v").longOpt("version").required(false).desc("Show version information.").build();
-		Option prefix = Option.builder("p").longOpt("prefix").required(false).argName("p1=ns1> <p2=ns2> <...").valueSeparator().hasArgs()
-				.desc("Define prefixes (p) for namespaces (ns). ").build();
+		Option prefix = Option.builder("p").longOpt("prefix").required(false).argName("prefixes=namespaces").valueSeparator().hasArg()
+				.desc("Define mapping of prefixes to namespaces. Specify mapping as comma-separated list of \"prefix1=namespace1, prefix2=namespace2, ...\". List must be surrounded by quotes in order to separate this command-line argument from other arguments.")
+				.build();
 		Option listPrefixes = Option.builder("l").longOpt("listprefix").required(false).desc("List prefixes for namespaces.").build();
 		Option pathfinder = Option.builder("f").longOpt("pathfinder").required(false).desc("List all paths starting from root node (with oval border).")
 				.build();
@@ -400,8 +400,8 @@ public class RdfCmap
 		Option ontoPrefix = Option.builder("oprf").longOpt("ontoprefix").required(false).hasArg().desc("Prefix for namespace of ontology creation.").build();
 		Option specificProperties = Option.builder("specprop").longOpt("specificproperties").required(false)
 				.desc("During ontology creation add specific domain properties as subproperties of AFX if possible.").build();
-		Option dropLongComments = Option.builder("dlc").longOpt("droplongcomments").required(false).desc("Ignore all existing long comments and recreate them.")
-				.build();
+		Option dropLongComments = Option.builder("dlc").longOpt("droplongcomments").required(false)
+				.desc("Ignore all existing long comments and create new ones.").build();
 		Option hideLiteralValues = Option.builder("hlv").longOpt("hideliterals").required(false)
 				.desc("Do not show literal values as explicit nodes in visualization.").build();
 
@@ -420,6 +420,7 @@ public class RdfCmap
 		appOptions.addOption(externalFiles);
 		appOptions.addOption(separate);
 		appOptions.addOption(writefiles);
+		appOptions.addOption(prefix);
 		appOptions.addOption(donotuseprefixes);
 		appOptions.addOption(donotuseblanknodes);
 		appOptions.addOption(donotusenamedshapes);
@@ -536,13 +537,22 @@ public class RdfCmap
 		cmd = new DefaultParser().parse(configOptions, args, true);
 		if (cmd.hasOption("prefix"))
 		{
-			String[] prefixes = cmd.getOptionValues("prefix");
-			RdfUtil.updatePrefixes(prefixes);
+			String prefixString = cmd.getOptionValue("prefix");
+			String[] prefixList = prefixString.split(",");
+			String[] prefixes = new String[prefixList.length * 2];
+			for (int i = 0; i < prefixList.length; i++)
+			{
+				String[] singlePrefix = prefixList[i].trim().split("=");
+				prefixes[2 * i] = singlePrefix[0];
+				prefixes[2 * i + 1] = singlePrefix[1];
+			}
+
+			Prefixes.updatePrefixes(prefixes);
 		}
 
 		if (cmd.hasOption("listprefix"))
 		{
-			RdfUtil.listPrefixes();
+			Prefixes.listPrefixes();
 			System.exit(0);
 		}
 
@@ -704,7 +714,7 @@ public class RdfCmap
 			else if (uri.contains(":"))
 			{
 				String[] segments = uri.split(":");
-				String namespace = AFOUtil.nsPrefixMap.get(segments[0]);
+				String namespace = Prefixes.nsPrefixMap.get(segments[0]);
 				RdfCmap.root = ResourceFactory.createResource(namespace + segments[1]);
 			}
 			else
@@ -813,21 +823,17 @@ public class RdfCmap
 	{
 		final Properties properties = new Properties();
 		properties.load(Thread.currentThread().getContextClassLoader().getResourceAsStream("rdfcmap.properties"));
-		log.info("Rdfcmap V" + properties.getProperty("version") + " ©OSTHUS 2017");
+		log.info("Rdfcmap V" + properties.getProperty("version") + " ©OSTHUS 2017-2018");
 	}
 
 	public static void printOsthus()
 	{
-		//@formatter:off
-		log.info("\r\n"
-				+ "  ____  ____________ ____  ______      \r\n" +
-				" / __ \\/ __/_  __/ // / / / / __/      \r\n" +
-				"/ /_/ /\\ \\  / / / _  / /_/ /\\ \\        \r\n" +
-				"\\____/___/_/_/_/_//_/\\____/___/_   ___ \r\n" +
-				"  / _ \\/ _ \\/ __/ ___/  |/  / _ | / _ \\\r\n" +
-				" / , _/ // / _// /__/ /|_/ / __ |/ ___/\r\n" +
-				"/_/|_/____/_/  \\___/_/  /_/_/ |_/_/  \r\n");
-		//@formatter:on
+		// @formatter:off
+		log.info("\r\n" + "  ____  ____________ ____  ______      \r\n" + " / __ \\/ __/_  __/ // / / / / __/      \r\n"
+				+ "/ /_/ /\\ \\  / / / _  / /_/ /\\ \\        \r\n" + "\\____/___/_/_/_/_//_/\\____/___/_   ___ \r\n"
+				+ "  / _ \\/ _ \\/ __/ ___/  |/  / _ | / _ \\\r\n" + " / , _/ // / _// /__/ /|_/ / __ |/ ___/\r\n"
+				+ "/_/|_/____/_/  \\___/_/  /_/_/ |_/_/  \r\n");
+		// @formatter:on
 	}
 
 	private static void configureLog(Level level)

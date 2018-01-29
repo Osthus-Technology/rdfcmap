@@ -76,6 +76,7 @@ import com.osthus.rdfcmap.helper.PreparedModels;
 import com.osthus.rdfcmap.helper.VisualizationInfoBuilderResult;
 import com.osthus.rdfcmap.util.AFOUtil;
 import com.osthus.rdfcmap.util.CmapUtil;
+import com.osthus.rdfcmap.util.Prefixes;
 import com.osthus.rdfcmap.util.RdfUtil;
 import com.osthus.rdfcmap.util.VizUtil;
 
@@ -802,7 +803,7 @@ public class Cmap2TurtleConverter
 			return model.getResource(propertyAsResource.getURI()).getProperty(AFOUtil.SKOS_PREF_LABEL).getString();
 		}
 
-		String prefix = RdfUtil.getNamespaceMap().get(propertyAsResource.getNameSpace());
+		String prefix = Prefixes.getNamespaceMap().get(propertyAsResource.getNameSpace());
 		if (isOboProperty(prefix))
 		{
 			String name = propertyAsResource.getLocalName().toUpperCase();
@@ -949,7 +950,7 @@ public class Cmap2TurtleConverter
 				String escapedRegexForSparql = label.replaceAll("\\(", "\\\\\\\\(").replaceAll("\\)", "\\\\\\\\)");
 				String escapedRegexForJava = label.replaceAll("\\(", "\\\\\\(").replaceAll("\\)", "\\\\\\)");
 				// @formatter:off
-					String queryString = RdfUtil.getPrefixes()
+					String queryString = Prefixes.getSparqlPrefixes()
 				             + "select ?s where { \n"
 				             + "  { \n"
 				             + "    OPTIONAL { ?s skos:prefLabel ?label . } \n"
@@ -969,7 +970,7 @@ public class Cmap2TurtleConverter
 				{
 					QuerySolution qs = results.next();
 					String namespace = qs.get("s").asResource().getNameSpace();
-					String prefix = RdfUtil.getNamespaceMap().get(namespace);
+					String prefix = Prefixes.getNamespaceMap().get(namespace);
 					String localname = "";
 					if (prefix != null && ((prefix.equals(m.group(3))) || prefix.replaceAll("-", "").equals(m.group(3)) || prefix.toLowerCase().equals("obo")))
 					{
@@ -985,7 +986,7 @@ public class Cmap2TurtleConverter
 							else
 							{
 								namespace = qs.get("s").asResource().getProperty(AFOUtil.DCT_IS_REPLACED_BY).getObject().asResource().getNameSpace();
-								prefix = RdfUtil.getNamespaceMap().get(namespace);
+								prefix = Prefixes.getNamespaceMap().get(namespace);
 								localname = qs.get("s").asResource().getProperty(AFOUtil.DCT_IS_REPLACED_BY).getObject().asResource().getLocalName();
 								String replaceLabel = qs.get("s").asResource().getProperty(AFOUtil.SKOS_PREF_LABEL).getString();
 								log.debug("Deprecated term: <<" + m.group(3) + ":" + label + ">> is replaced by <<" + prefix + ":" + replaceLabel + ">> ("
@@ -1055,7 +1056,7 @@ public class Cmap2TurtleConverter
 
 					String escapedRegexForSparql = title.replaceAll("\\(", "\\\\\\\\(").replaceAll("\\)", "\\\\\\\\)");
 				// @formatter:off
-						String queryString = RdfUtil.getPrefixes()
+						String queryString = Prefixes.getSparqlPrefixes()
 					             + "select ?s where { \n"
 					             + "  ?s skos:prefLabel ?label .\n"
 					             + "FILTER regex(?label, \"^" + escapedRegexForSparql + "$\", \"i\" )\n"
@@ -1085,7 +1086,7 @@ public class Cmap2TurtleConverter
 								{
 									link = qs.get("s").asResource().getProperty(AFOUtil.DCT_IS_REPLACED_BY).getObject().asResource();
 									namespace = qs.get("s").asResource().getProperty(AFOUtil.DCT_IS_REPLACED_BY).getObject().asResource().getNameSpace();
-									String prefix = RdfUtil.getNamespaceMap().get(namespace);
+									String prefix = Prefixes.getNamespaceMap().get(namespace);
 									String localname = qs.get("s").asResource().getProperty(AFOUtil.DCT_IS_REPLACED_BY).getObject().asResource().getLocalName();
 									String replaceLabel = qs.get("s").asResource().getProperty(AFOUtil.SKOS_PREF_LABEL).getString();
 									log.debug("Deprecated term: <<af-x:" + title + ">> is replaced by <<" + prefix + ":" + replaceLabel + ">> (" + prefix + ":"
@@ -1121,7 +1122,7 @@ public class Cmap2TurtleConverter
 
 					String escapedRegexForSparql = title.replaceAll("\\(", "\\\\\\\\(").replaceAll("\\)", "\\\\\\\\)");
 					// @formatter:off
-						String queryString = RdfUtil.getPrefixes()
+						String queryString = Prefixes.getSparqlPrefixes()
 					             + "select ?s where { \n"
 					             + "  { ?s rdfs:label ?label . } UNION { ?s skos:prefLabel ?label . } \n"
 					             + "FILTER regex(?label, \"^" + escapedRegexForSparql + "$\", \"i\" )\n"
@@ -1870,9 +1871,9 @@ public class Cmap2TurtleConverter
 		Model otherTriplesModel = ModelFactory.createDefaultModel();
 		if (RdfCmap.usePrefixes)
 		{
-			vizModel.setNsPrefixes(AFOUtil.nsPrefixMap);
-			instanceModel.setNsPrefixes(AFOUtil.nsPrefixMap);
-			otherTriplesModel.setNsPrefixes(AFOUtil.nsPrefixMap);
+			vizModel.setNsPrefixes(Prefixes.nsPrefixMap);
+			instanceModel.setNsPrefixes(Prefixes.nsPrefixMap);
+			otherTriplesModel.setNsPrefixes(Prefixes.nsPrefixMap);
 		}
 
 		List<Statement> vizStatements = new ArrayList<>();
@@ -2129,7 +2130,7 @@ public class Cmap2TurtleConverter
 				String filterLabel;
 				if (segments.length > 1)
 				{
-					namespace = AFOUtil.nsPrefixMap.get(segments[0]);
+					namespace = Prefixes.nsPrefixMap.get(segments[0]);
 					if (namespace == null || namespace.isEmpty())
 					{
 						log.info("Missing prefix for term: " + label);
@@ -2215,7 +2216,7 @@ public class Cmap2TurtleConverter
 					continue;
 				}
 
-				String iri = AFOUtil.nsPrefixMap.get(m.group(1).trim());
+				String iri = Prefixes.nsPrefixMap.get(m.group(1).trim());
 				String localName = m.group(2).trim();
 				if (iri.equals(AFOUtil.OBO_PREFIX))
 				{
@@ -2367,7 +2368,7 @@ public class Cmap2TurtleConverter
 				String[] segments = literalValue.split("\\^\\^");
 				literalValueString = segments[0].substring(1, segments[0].length() - 1); // cut quotes
 				String[] dataTypeSegments = segments[1].split(":");
-				String dataTypeIri = AFOUtil.nsPrefixMap.get(dataTypeSegments[0]) + dataTypeSegments[1];
+				String dataTypeIri = Prefixes.nsPrefixMap.get(dataTypeSegments[0]) + dataTypeSegments[1];
 
 				if (AFOUtil.XSD_STRING.getURI().equals(dataTypeIri))
 				{
@@ -2543,9 +2544,9 @@ public class Cmap2TurtleConverter
 		Model otherTriplesModel = ModelFactory.createDefaultModel();
 		if (RdfCmap.usePrefixes)
 		{
-			vizModel.setNsPrefixes(AFOUtil.nsPrefixMap);
-			instanceModel.setNsPrefixes(AFOUtil.nsPrefixMap);
-			otherTriplesModel.setNsPrefixes(AFOUtil.nsPrefixMap);
+			vizModel.setNsPrefixes(Prefixes.nsPrefixMap);
+			instanceModel.setNsPrefixes(Prefixes.nsPrefixMap);
+			otherTriplesModel.setNsPrefixes(Prefixes.nsPrefixMap);
 		}
 
 		List<Statement> vizStatements = new ArrayList<>();
@@ -2635,7 +2636,7 @@ public class Cmap2TurtleConverter
 		Model singleInstanceModel = ModelFactory.createDefaultModel();
 		if (RdfCmap.usePrefixes)
 		{
-			singleInstanceModel.setNsPrefixes(AFOUtil.nsPrefixMap);
+			singleInstanceModel.setNsPrefixes(Prefixes.nsPrefixMap);
 		}
 
 		while (instanceIterator.hasNext())

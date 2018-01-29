@@ -41,6 +41,7 @@ import com.osthus.rdfcmap.enums.ConceptProperty;
 import com.osthus.rdfcmap.helper.ConceptRelation;
 import com.osthus.rdfcmap.util.AFOUtil;
 import com.osthus.rdfcmap.util.CmapUtil;
+import com.osthus.rdfcmap.util.Prefixes;
 import com.osthus.rdfcmap.util.RdfUtil;
 import com.osthus.rdfcmap.util.VizUtil;
 
@@ -195,7 +196,7 @@ public class ShapesCreator1_1_5
 	private Model createModelFromNodeShape(NodeShape nodeShape, String iri, Model model)
 	{
 		Model shapeModel = ModelFactory.createDefaultModel();
-		shapeModel.setNsPrefixes(RdfUtil.prefixMap);
+		shapeModel.setNsPrefixes(Prefixes.nsPrefixMap);
 		Resource shapeResource = shapeModel.createResource(iri);
 
 		shapeResource.addProperty(AFOUtil.RDF_TYPE, AFOUtil.SHACL_NODE_SHAPE);

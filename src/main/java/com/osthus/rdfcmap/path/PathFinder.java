@@ -35,6 +35,7 @@ import com.osthus.rdfcmap.cmap.Cmap2TurtleConverter;
 import com.osthus.rdfcmap.cmap.Turtle2CmapConverter;
 import com.osthus.rdfcmap.util.AFOUtil;
 import com.osthus.rdfcmap.util.CmapUtil;
+import com.osthus.rdfcmap.util.Prefixes;
 import com.osthus.rdfcmap.util.RdfUtil;
 import com.osthus.rdfcmap.util.VizUtil;
 
@@ -195,7 +196,7 @@ public class PathFinder
 				String hopTypeLabel = getResourceLabel(hopType);
 				if (!hopTypeLabel.contains(":"))
 				{
-					hopTypeLabel = RdfUtil.getNamespaceMap().get(hopType.getNameSpace()) + ":" + hopType.getLocalName();
+					hopTypeLabel = Prefixes.getNamespaceMap().get(hopType.getNameSpace()) + ":" + hopType.getLocalName();
 				}
 
 				if (RdfUtil.isAFTNamespace(hopType.getNameSpace()))
@@ -367,7 +368,7 @@ public class PathFinder
 			propertyLabel = property.asResource().getLocalName();
 		}
 
-		return RdfUtil.getNamespaceMap().get(property.asResource().getNameSpace()) + ":" + propertyLabel;
+		return Prefixes.getNamespaceMap().get(property.asResource().getNameSpace()) + ":" + propertyLabel;
 	}
 
 	private String getResourceLabel(Resource resource)
@@ -388,7 +389,7 @@ public class PathFinder
 		}
 		else
 		{
-			resourceLabel = RdfUtil.getNamespaceMap().get(resource.getNameSpace()) + ":" + resource.getLocalName();
+			resourceLabel = Prefixes.getNamespaceMap().get(resource.getNameSpace()) + ":" + resource.getLocalName();
 		}
 
 		return resourceLabel;

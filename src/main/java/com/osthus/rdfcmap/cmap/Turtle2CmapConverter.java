@@ -47,6 +47,7 @@ import com.osthus.rdfcmap.helper.LinkedConcept;
 import com.osthus.rdfcmap.helper.VisualizationInfoBuilderResult;
 import com.osthus.rdfcmap.util.AFOUtil;
 import com.osthus.rdfcmap.util.CmapUtil;
+import com.osthus.rdfcmap.util.Prefixes;
 import com.osthus.rdfcmap.util.RdfUtil;
 import com.osthus.rdfcmap.util.VizUtil;
 
@@ -1424,7 +1425,7 @@ public class Turtle2CmapConverter
 		}
 		if (!linkDefinition.isEmpty())
 		{
-			String id = RdfUtil.getNamespaceMap().get(resource.getNameSpace()) + ":" + resource.getLocalName() + "\n\n";
+			String id = Prefixes.getNamespaceMap().get(resource.getNameSpace()) + ":" + resource.getLocalName() + "\n\n";
 			linkPopup.append(id);
 			linkPopup.append("definition: \n" + linkDefinition);
 		}
@@ -1460,7 +1461,7 @@ public class Turtle2CmapConverter
 		}
 		else
 		{
-			String prefix = RdfUtil.getNamespaceMap().get(resource.getNameSpace());
+			String prefix = Prefixes.getNamespaceMap().get(resource.getNameSpace());
 			if (prefix != null && !prefix.isEmpty())
 			{
 				linkProperties.put(ConceptProperty.TITLE.name(), breakString(prefix + ":" + resource.getLocalName(), MAX_CHARS));
@@ -1735,7 +1736,7 @@ public class Turtle2CmapConverter
 				}
 
 				String label = resource.getProperty(AFOUtil.SKOS_PREF_LABEL).getString();
-				String prefix = RdfUtil.getNamespaceMap().get(resource.getNameSpace());
+				String prefix = Prefixes.getNamespaceMap().get(resource.getNameSpace());
 				line = line.replaceAll("<" + m.group(2), "<<" + prefix + ":");
 				line = line.replaceAll(m.group(3) + ">", label + ">>");
 			}
@@ -1779,13 +1780,13 @@ public class Turtle2CmapConverter
 					}
 				}
 				boolean isNamespaceKnown = false;
-				for (String namespace : RdfUtil.getNamespaceMap().keySet())
+				for (String namespace : Prefixes.getNamespaceMap().keySet())
 				{
 					if (m.group(1).contains(namespace))
 					{
 						isNamespaceKnown = true;
 						String replacement = m.group(1).replaceAll("<", "").replaceAll(">", "").replace(namespace,
-								RdfUtil.getNamespaceMap().get(namespace) + ":");
+								Prefixes.getNamespaceMap().get(namespace) + ":");
 						line = line.replace(m.group(1), replacement);
 						break;
 					}
@@ -1915,7 +1916,7 @@ public class Turtle2CmapConverter
 
 			if (popupText.length() > 0)
 			{
-				String namespacePrefix = RdfUtil.getNamespaceMap().get(resource.getNameSpace());
+				String namespacePrefix = Prefixes.getNamespaceMap().get(resource.getNameSpace());
 				String id = StringUtils.EMPTY;
 				if (namespacePrefix != null && !namespacePrefix.isEmpty())
 				{
@@ -1947,7 +1948,7 @@ public class Turtle2CmapConverter
 				{
 					parentTypeDefinition = parentTypeDefinitionIterator.next().getLiteral().getString();
 					hasParentTypeWithDefinition = true;
-					String id = RdfUtil.getNamespaceMap().get(parentType.getNameSpace()) + ":" + parentType.getLocalName() + "\n\n";
+					String id = Prefixes.getNamespaceMap().get(parentType.getNameSpace()) + ":" + parentType.getLocalName() + "\n\n";
 					popupText.append(id);
 				}
 				if (!parentTypeLabel.isEmpty())
@@ -2286,7 +2287,7 @@ public class Turtle2CmapConverter
 		{
 			return labelString;
 		}
-		String prefix = RdfUtil.getNamespaceMap().get(resource.getNameSpace());
+		String prefix = Prefixes.getNamespaceMap().get(resource.getNameSpace());
 		if (prefix != null && !prefix.isEmpty())
 		{
 			if (prefix.equals("obo"))

@@ -914,7 +914,7 @@ public class CmapUtil
 				String foundPrefix = m.group(2);
 				String label = m.group(3).trim();
 
-				String namespace = RdfUtil.prefixMap.get(foundPrefix);
+				String namespace = Prefixes.nsPrefixMap.get(foundPrefix);
 				if (namespace == null || namespace.isEmpty())
 				{
 					log.info("Found URI with unknown prefix: " + m.group(2) + ":" + m.group(3));
