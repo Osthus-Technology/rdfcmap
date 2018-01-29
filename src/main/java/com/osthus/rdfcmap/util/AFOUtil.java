@@ -193,6 +193,7 @@ public class AFOUtil
 	public static final Property OBO_ELUCIDATION_DISGUISED = ResourceFactory.createProperty(CmapUtil.URN_UUID + "IAO_0000600");
 	public static final Property OBO_EXAMPLE = ResourceFactory.createProperty(OBO_PREFIX + "IAO_0000112");
 	public static final Property OBO_EXAMPLE_DISGUISED = ResourceFactory.createProperty(CmapUtil.URN_UUID + "IAO_0000112");
+	public static final Property OBO_EDITOR_PREFERRED_LABEL = ResourceFactory.createProperty(OBO_PREFIX + "IAO_0000111");
 
 	public static final Property QUDT_NUMERIC_VALUE = ResourceFactory.createProperty(QUDT_SCHEMA_PREFIX + "numericValue");
 	public static final Property QUDT_UNIT = ResourceFactory.createProperty(QUDT_SCHEMA_PREFIX + "unit");

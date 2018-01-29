@@ -51,6 +51,8 @@ public class SparqlCreator
 
 	private Set<Statement> graphStatements = new LinkedHashSet<Statement>();
 
+	private Set<String> graphStatementsAsStrings = new LinkedHashSet<String>();
+
 	private Map<String, String> uri2node = new HashMap<String, String>();
 
 	public void create(Path pathToInputFile, String[] additionalFiles) throws JAXBException, IOException, ParserConfigurationException, SAXException
@@ -145,7 +147,7 @@ public class SparqlCreator
 				// skip for query
 				continue;
 			}
-			String label = getPropertyLabel(statement.getPredicate());
+			String label = getPropertyLabel(statement.getPredicate(), fullModel);
 			targetPropertyLabels.add(label);
 			targetProperties.add(statement.getPredicate());
 		}
@@ -165,7 +167,7 @@ public class SparqlCreator
 
 		log.info("Sequence of statements of graph from source to target:\n" + StringUtils.join(graphStatements, "\n") + "\n");
 
-		sb = createGraphString(model, fullModel, sb);
+		sb = createGraphString(model, fullModel, sb, targetNode);
 
 		String targetNodeString = getPrefixedString(targetNode, model, fullModel);
 		int i = 0;
@@ -191,6 +193,8 @@ public class SparqlCreator
 	{
 		Set<Statement> handledStatements = new LinkedHashSet<Statement>();
 		handledStatements.addAll(graphStatements);
+		Set<String> handledStatementsAsStrings = new LinkedHashSet<String>();
+		handledStatementsAsStrings.addAll(graphStatementsAsStrings);
 		for (Iterator<Statement> iterator = model.listStatements(); iterator.hasNext();)
 		{
 			Statement statement = iterator.next();
@@ -199,20 +203,27 @@ public class SparqlCreator
 				continue;
 			}
 
+			String statementAsString = getStatementString(model, fullModel, statement);
+			if (handledStatementsAsStrings.contains(statementAsString))
+			{
+				continue;
+			}
+
 			Resource subject = statement.getSubject();
 
-			if (isTargetNode(statement.getSubject(), targetNode))
+			if (isTargetNode(subject, targetNode))
 			{
 				continue;
 			}
 
 			handledStatements.add(statement);
+			handledStatementsAsStrings.add(statementAsString);
 
-			sb = appendStatementString(model, fullModel, sb, statement);
+			sb.append(getStatementString(model, fullModel, statement));
 
 			if (RdfCmap.includePathProperties)
 			{
-				StmtIterator stmtIterator = model.listStatements(statement.getSubject(), (Property) null, (RDFNode) null);
+				StmtIterator stmtIterator = model.listStatements(subject, (Property) null, (RDFNode) null);
 				while (stmtIterator.hasNext())
 				{
 					Statement subjectStatement = stmtIterator.next();
@@ -221,7 +232,14 @@ public class SparqlCreator
 						continue;
 					}
 
+					String subjectStatementAsString = getStatementString(model, fullModel, subjectStatement);
+					if (handledStatementsAsStrings.contains(subjectStatementAsString))
+					{
+						continue;
+					}
+
 					handledStatements.add(subjectStatement);
+					handledStatementsAsStrings.add(subjectStatementAsString);
 
 					Property subjectProperty = subjectStatement.getPredicate();
 					if (subjectProperty.equals(statement.getPredicate()) || subjectProperty.equals(VizUtil.AFV_IS_SOURCE_NODE)
@@ -229,7 +247,8 @@ public class SparqlCreator
 					{
 						continue;
 					}
-					sb = appendStatementString(model, fullModel, sb, subjectStatement);
+
+					sb.append(getStatementString(model, fullModel, subjectStatement));
 				}
 			}
 		}
@@ -260,12 +279,13 @@ public class SparqlCreator
 		}
 	}
 
-	private StringBuilder createGraphString(Model model, Model fullModel, StringBuilder sb)
+	private StringBuilder createGraphString(Model model, Model fullModel, StringBuilder sb, Resource targetNode)
 	{
 		for (Iterator<Statement> iterator = graphStatements.iterator(); iterator.hasNext();)
 		{
 			Statement statement = iterator.next();
-			sb = appendStatementString(model, fullModel, sb, statement);
+
+			graphStatementsAsStrings.add(getStatementString(model, fullModel, statement));
 
 			if (RdfCmap.includePathProperties)
 			{
@@ -277,23 +297,42 @@ public class SparqlCreator
 					{
 						continue;
 					}
+					String statementAsString = getStatementString(model, fullModel, subjectStatement);
+					if (graphStatementsAsStrings.contains(statementAsString))
+					{
+						continue;
+					}
+
 					Property subjectProperty = subjectStatement.getPredicate();
 					if (subjectProperty.equals(statement.getPredicate()) || subjectProperty.equals(VizUtil.AFV_IS_SOURCE_NODE)
 							|| subjectProperty.equals(VizUtil.AFV_IS_TARGET_NODE))
 					{
 						continue;
 					}
-					sb = appendStatementString(model, fullModel, sb, subjectStatement);
+
+					if (isTargetNode(statement.getSubject(), targetNode) && subjectStatement.getObject().isLiteral())
+					{
+						// skip literal properties of target node because they are added as queried parameters
+						continue;
+					}
+
+					graphStatementsAsStrings.add(getStatementString(model, fullModel, subjectStatement));
+				}
 				}
 			}
+
+		for (Iterator<String> iterator = graphStatementsAsStrings.iterator(); iterator.hasNext();)
+		{
+			String string = iterator.next();
+			sb.append(string);
 		}
 
 		return sb;
 	}
 
-	private StringBuilder appendStatementString(Model model, Model fullModel, StringBuilder sb, Statement statement)
+	private String getStatementString(Model model, Model fullModel, Statement statement)
 	{
-		sb.append("  ");
+		String statementAsString = "  ";
 		Resource subject = statement.getSubject();
 		Property property = statement.getPredicate();
 		if (!statement.getObject().isLiteral())
@@ -303,14 +342,14 @@ public class SparqlCreator
 			{
 				if (object.isURIResource())
 				{
-					sb.append(getPrefixedString(subject, model, fullModel) + " " + getPrefixedString(property, model, fullModel) + " "
-							+ getPrefixedString(object, model, fullModel) + " . \n");
+					statementAsString = statementAsString + (getPrefixedString(subject, model, fullModel) + " " + getPrefixedString(property, model, fullModel)
+							+ " " + getPrefixedString(object, model, fullModel) + " . \n");
 				}
 				else
 				{
 					// anon object
-					sb.append(getPrefixedString(subject, model, fullModel) + " " + getPrefixedString(property, model, fullModel) + " "
-							+ getAnonLabel(object, model, fullModel) + " . \n");
+					statementAsString = statementAsString + (getPrefixedString(subject, model, fullModel) + " " + getPrefixedString(property, model, fullModel)
+							+ " " + getAnonLabel(object, model, fullModel) + " . \n");
 				}
 			}
 			else
@@ -319,13 +358,13 @@ public class SparqlCreator
 				if (object.isURIResource())
 				{
 					// anon subject
-					sb.append(getAnonLabel(subject, model, fullModel) + " " + getPrefixedString(property, model, fullModel) + " "
+					statementAsString = statementAsString + (getAnonLabel(subject, model, fullModel) + " " + getPrefixedString(property, model, fullModel) + " "
 							+ getPrefixedString(object, model, fullModel) + " . \n");
 				}
 				else
 				{
 					// anon subject and object
-					sb.append(getAnonLabel(subject, model, fullModel) + " " + getPrefixedString(property, model, fullModel) + " "
+					statementAsString = statementAsString + (getAnonLabel(subject, model, fullModel) + " " + getPrefixedString(property, model, fullModel) + " "
 							+ getAnonLabel(object, model, fullModel) + " . \n");
 				}
 			}
@@ -336,18 +375,18 @@ public class SparqlCreator
 			if (subject.isURIResource())
 			{
 				// literal object
-				sb.append(getPrefixedString(subject, model, fullModel) + " " + getPrefixedString(property, model, fullModel) + " "
-						+ getLiteralString(statement.getObject().asLiteral()) + " . \n");
+				statementAsString = statementAsString + (getPrefixedString(subject, model, fullModel) + " " + getPrefixedString(property, model, fullModel)
+						+ " " + getLiteralString(statement.getObject().asLiteral()) + " . \n");
 			}
 			else
 			{
 				// anon subject and literal object
-				sb.append(getAnonLabel(subject, model, fullModel) + " " + getPrefixedString(property, model, fullModel) + " "
+				statementAsString = statementAsString + (getAnonLabel(subject, model, fullModel) + " " + getPrefixedString(property, model, fullModel) + " "
 						+ getLiteralString(statement.getObject().asLiteral()) + " . \n");
 			}
 		}
 
-		return sb;
+		return statementAsString;
 	}
 
 	private String getLiteralString(Literal literal)
@@ -365,7 +404,11 @@ public class SparqlCreator
 		String namespace = resource.getNameSpace();
 		String localName = resource.getLocalName();
 		String prefix = Prefixes.getNamespaceMap().get(namespace);
-		if (prefix == null)
+		if (prefix == null && resource.isURIResource() && namespace.equals(AFOUtil.OBO_PREFIX))
+		{
+			return getOboPrefix(resource);
+		}
+		else if (prefix == null)
 		{
 			if (resource.isAnon())
 			{
@@ -389,14 +432,19 @@ public class SparqlCreator
 		}
 		else if (prefix.equals("obo"))
 		{
-			String[] segments = resource.getURI().split("_");
-			prefix = Prefixes.getNamespaceMap().get(segments[0]);
-			return prefix + ":_" + segments[segments.length - 1];
+			return getOboPrefix(resource);
 		}
 		else
 		{
 			return prefix + ":" + localName;
 		}
+	}
+
+	private String getOboPrefix(Resource resource)
+	{
+		String[] segments = resource.getURI().split("_");
+		String prefix = Prefixes.getNamespaceMap().get(segments[0]);
+		return prefix + ":_" + segments[segments.length - 1];
 	}
 
 	private String getAnonLabel(Resource resource, Model model, Model fullModel)
@@ -566,20 +614,28 @@ public class SparqlCreator
 		return pathList;
 	}
 
-	private String getPropertyLabel(Property property)
+	private String getPropertyLabel(Property property, Model model)
 	{
 		String propertyLabel = StringUtils.EMPTY;
-		if (property.asResource().hasProperty(AFOUtil.SKOS_PREF_LABEL))
+		if (model.listStatements(property.asResource(), AFOUtil.SKOS_PREF_LABEL, (RDFNode) null).hasNext())
 		{
-			propertyLabel = property.asResource().getProperty(AFOUtil.SKOS_PREF_LABEL).getString();
+			propertyLabel = model.listStatements(property.asResource(), AFOUtil.SKOS_PREF_LABEL, (RDFNode) null).next().getString();
 		}
-		else if (property.asResource().hasProperty(AFOUtil.RDFS_LABEL))
+		else if (model.listStatements(property.asResource(), AFOUtil.RDFS_LABEL, (RDFNode) null).hasNext())
 		{
-			propertyLabel = property.asResource().getProperty(AFOUtil.RDFS_LABEL).getString();
+			propertyLabel = model.listStatements(property.asResource(), AFOUtil.RDFS_LABEL, (RDFNode) null).next().getString();
 		}
-		else if (property.asResource().hasProperty(AFOUtil.DCT_TITLE))
+		else if (model.listStatements(property.asResource(), AFOUtil.DCT_TITLE, (RDFNode) null).hasNext())
 		{
-			propertyLabel = property.asResource().getProperty(AFOUtil.DCT_TITLE).getString();
+			propertyLabel = model.listStatements(property.asResource(), AFOUtil.DCT_TITLE, (RDFNode) null).next().getString();
+		}
+		else if (model.listStatements(property.asResource(), AFOUtil.DCT_TITLE, (RDFNode) null).hasNext())
+		{
+			propertyLabel = model.listStatements(property.asResource(), AFOUtil.DCT_TITLE, (RDFNode) null).next().getString();
+		}
+		else if (model.listStatements(property.asResource(), AFOUtil.OBO_EDITOR_PREFERRED_LABEL, (RDFNode) null).hasNext())
+		{
+			propertyLabel = model.listStatements(property.asResource(), AFOUtil.OBO_EDITOR_PREFERRED_LABEL, (RDFNode) null).next().getString();
 		}
 		else if (property.asResource().getLocalName() != null && !property.asResource().getLocalName().isEmpty())
 		{
@@ -590,7 +646,7 @@ public class SparqlCreator
 			propertyLabel = "property";
 		}
 
-		return "?" + propertyLabel;
+		return "?" + propertyLabel.replaceAll("\\s", "_");
 	}
 
 	private String getResourceLabel(Resource resource, Model model, Model fullModel)

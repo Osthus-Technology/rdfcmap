@@ -29,3 +29,7 @@ hs_err_pid*
 /*.ttl
 /test/*.cxl
 /test
+/*.pdf
+/*.cxl
+/*.adf
+/*.txt
