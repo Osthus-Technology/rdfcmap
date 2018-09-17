@@ -151,6 +151,9 @@ public class Cmap2TurtleConverter
 		// Fourth, we walk through all concepts of CXL, compare to resources of RDF model and remove deleted concepts as well as all their relations.
 		model = cleanModel(model);
 
+		// Fifth, we walk through all concepts of CXL, replace created named individuals for resources from vocabulary e.g. qudt:mAU.
+		model = replaceNamedResources(model);
+
 		prepareOutput(pathToInputFile, model);
 
 		log.info(model.listStatements().toList().size() + " triples total after processing.");
@@ -477,7 +480,9 @@ public class Cmap2TurtleConverter
 			Resource fromConcept = model.getResource(linkedConcept.from);
 			String linkId = linkedConcept.to;
 			Resource link = model.getResource(linkId);
-			link = tryToExtractLinkFromAfxAndObo(model, link);
+			String label = RdfUtil.getLabelFromDctTitle(model, link);
+			// link = tryToExtractLinkFromAfxAndObo(model, link);
+			link = RdfUtil.getResourceByLabel(model, label, true, false);
 
 			statementsToRemove.addAll(model.listStatements(fromConcept, ResourceFactory.createProperty(linkId), (RDFNode) null).toList());
 			for (Iterator<LinkedConcept> iterator2 = connectionsFromLinkToConcept.iterator(); iterator2.hasNext();)
@@ -499,17 +504,30 @@ public class Cmap2TurtleConverter
 				{
 					// handle object properties of imported ontologies
 					Resource vizLink = model.getResource(link.getURI().replace(CmapUtil.URN_UUID, VizUtil.AFV_PREFIX));
-					String vizLinkLabel = unbreakString(vizLink.getProperty(AFOUtil.DCT_TITLE).getString());
-					String[] segments = vizLinkLabel.split(":");
-					if (segments[1].contains(" "))
+					String vizLinkLabel = StringUtils.EMPTY;
+					if (vizLink.getProperty(AFOUtil.DCT_TITLE) != null && !vizLink.getProperty(AFOUtil.DCT_TITLE).getString().isEmpty())
 					{
-						String vizLinkLabelCapitalized = WordUtils.capitalizeFully(segments[1], ' ').replaceAll(" ", "");
-						String firstLetterLowerCase = vizLinkLabelCapitalized.substring(0, 1).toLowerCase();
-						vizLinkLabel = segments[0] + ":" + firstLetterLowerCase + vizLinkLabelCapitalized.substring(1, vizLinkLabelCapitalized.length());
+						vizLinkLabel = unbreakString(vizLink.getProperty(AFOUtil.DCT_TITLE).getString());
 					}
-					String vizLinkUri = CmapUtil.replacePrefixesWithNamespaces(model, Arrays.asList(vizLinkLabel)).get(0);
-					vizLinkUri = vizLinkUri.replaceAll("<", "").replaceAll(">", "");
-					property = ResourceFactory.createProperty(vizLinkUri);
+					else
+					{
+						String namespace = vizLink.getNameSpace();
+						String localname = vizLink.getLocalName();
+						String prefix = Prefixes.getNamespaceMap().get(namespace);
+						vizLinkLabel = prefix + ":" + localname;
+					}
+					// String[] segments = vizLinkLabel.split(":");
+					// if (segments[1].contains(" "))
+					// {
+					// String vizLinkLabelCapitalized = WordUtils.capitalizeFully(segments[1], ' ').replaceAll(" ", "");
+					// String firstLetterLowerCase = vizLinkLabelCapitalized.substring(0, 1).toLowerCase();
+					// vizLinkLabel = segments[0] + ":" + firstLetterLowerCase + vizLinkLabelCapitalized.substring(1, vizLinkLabelCapitalized.length());
+					// }
+					// String vizLinkUri = CmapUtil.replacePrefixesWithNamespaces(model, Arrays.asList(vizLinkLabel)).get(0);
+					// vizLinkUri = vizLinkUri.replaceAll("<", "").replaceAll(">", "");
+					// property = ResourceFactory.createProperty(vizLinkUri);
+					Resource resource = RdfUtil.getResourceByLabel(model, vizLinkLabel, true, false);
+					property = model.getProperty(resource.getURI());
 				}
 
 				statementsToAdd.add(ResourceFactory.createStatement(fromConcept, property, toConcept));
@@ -534,24 +552,26 @@ public class Cmap2TurtleConverter
 					statementsToRemove.add(relatedIterator.next());
 				}
 
-				Resource link = tryToExtractLinkFromAfxAndObo(model, singleResource);
-				if (link.getNameSpace().equals(AFOUtil.AFX_PREFIX) || link.getNameSpace().equals(AFOUtil.OBO_PREFIX))
-				{
-					statementsToAdd.add(ResourceFactory.createStatement(singleResource, AFOUtil.SKOS_RELATED, link));
-				}
-				else
-				{
-					Resource externalLink = RdfUtil.getResourceByLabel(model, link.getProperty(AFOUtil.DCT_TITLE).getString(), true, false);
-					if (externalLink != null)
-					{
-						statementsToAdd.add(ResourceFactory.createStatement(singleResource, AFOUtil.SKOS_RELATED, externalLink));
-					}
-					else
-					{
-						log.error("Could not resolve property: " + link.getURI()
-								+ (link.hasProperty(AFOUtil.DCT_TITLE) ? " " + link.getProperty(AFOUtil.DCT_TITLE).getString() : ""));
-					}
-				}
+				String label = RdfUtil.getLabelFromDctTitle(model, singleResource);
+				Resource link = RdfUtil.getResourceByLabel(model, label, true, false);
+				// Resource link = tryToExtractLinkFromAfxAndObo(model, singleResource);
+				// if (link.getNameSpace().equals(AFOUtil.AFX_PREFIX) || link.getNameSpace().equals(AFOUtil.OBO_PREFIX))
+				// {
+				statementsToAdd.add(ResourceFactory.createStatement(singleResource, AFOUtil.SKOS_RELATED, link));
+				// }
+				// else
+				// {
+				// Resource externalLink = RdfUtil.getResourceByLabel(model, link.getProperty(AFOUtil.DCT_TITLE).getString(), true, false);
+				// if (externalLink != null)
+				// {
+				// statementsToAdd.add(ResourceFactory.createStatement(singleResource, AFOUtil.SKOS_RELATED, externalLink));
+				// }
+				// else
+				// {
+				// log.error("Could not resolve property: " + link.getURI()
+				// + (link.hasProperty(AFOUtil.DCT_TITLE) ? " " + link.getProperty(AFOUtil.DCT_TITLE).getString() : ""));
+				// }
+				// }
 			}
 		}
 		model.remove(statementsToRemove);
@@ -1358,12 +1378,12 @@ public class Cmap2TurtleConverter
 			if (label != null && !label.isEmpty())
 			{
 				label = unbreakString(label).trim();
-				if (label.startsWith("[") && label.endsWith("]"))
+				if (label.contains("[") && label.contains("]") && !label.contains("\"") && !label.contains("^^"))
 				{
 					conceptProperties.put(ConceptProperty.IS_BLANK_NODE.name(), "true");
-					label = label.substring(1, label.length() - 1);
+					label = label.replaceAll("\\[", "").replaceAll("\\]", "");
 				}
-				else if ((label.startsWith("\"") && label.contains("\"^^")) || label.contains("xsd:"))
+				else if ((label.startsWith("\"") && label.contains("\"^^")))
 				{
 					conceptProperties.put(ConceptProperty.IS_LITERAL_NODE.name(), "true");
 				}
@@ -1480,16 +1500,25 @@ public class Cmap2TurtleConverter
 			if (borderShape != null && !borderShape.isEmpty())
 			{
 				conceptProperties.put(ConceptProperty.BORDER_SHAPE.name(), borderShape);
-				if (borderShape.equals("rounded-rectangle"))
+				if (conceptProperties.get(ConceptProperty.IS_LITERAL_NODE.name()) == null
+						|| conceptProperties.get(ConceptProperty.IS_LITERAL_NODE.name()).equals("false"))
 				{
-					log.debug("Found class node. Check for punning.");
-					conceptProperties.put(ConceptProperty.IS_CLASS.name(), "true");
+					if (borderShape.equals("rounded-rectangle"))
+					{
+						log.debug("Found class node. Check for punning.");
+						conceptProperties.put(ConceptProperty.IS_CLASS.name(), "true");
+					}
 				}
 			}
 
 			if (borderStyle != null && !borderStyle.isEmpty())
 			{
 				conceptProperties.put(ConceptProperty.BORDER_STYLE.name(), borderStyle);
+				if (borderStyle.equals("dotted") || borderStyle.equals("dashed"))
+				{
+					conceptProperties.put(ConceptProperty.IS_CLASS.name(), "true");
+					log.debug("Found class node with dashed/dotted border.");
+				}
 
 				if (borderShape != null && borderShape.equals("oval"))
 				{
@@ -1919,14 +1948,16 @@ public class Cmap2TurtleConverter
 				isParent = model.listStatements((Resource) null, VizUtil.AFV_HAS_PARENT, uiResource).hasNext();
 			}
 
-			if (subject.getURI().startsWith(CmapUtil.URN_UUID) && !(subjectType.getURI().contains(VizUtil.AFV_PREFIX)) && !isConnection && !isLink && !isParent
-					&& !subjectType.getURI().equals(AFOUtil.OWL_OBJECT_PROPERTY.getURI()))
+			if (subject.getURI().startsWith(CmapUtil.URN_UUID) && !(subjectType != null && subjectType.getURI().contains(VizUtil.AFV_PREFIX)) && !isConnection
+					&& !isLink && !isParent && !(subjectType != null && subjectType.getURI().equals(AFOUtil.OWL_OBJECT_PROPERTY.getURI())))
 			{
 				instanceStatements.add(statement);
 			}
 			else if (subject.getURI().startsWith(VizUtil.AFV_PREFIX)
-					|| (subject.getURI().startsWith(CmapUtil.URN_UUID) && subjectType.getURI().contains(VizUtil.AFV_PREFIX)) || isConnection || isLink
-					|| (subject.getURI().startsWith(CmapUtil.URN_UUID) && subjectType.getURI().equals(AFOUtil.OWL_OBJECT_PROPERTY)) || isParent)
+					|| (subject.getURI().startsWith(CmapUtil.URN_UUID) && (subjectType != null && subjectType.getURI().contains(VizUtil.AFV_PREFIX)))
+					|| isConnection || isLink
+					|| (subject.getURI().startsWith(CmapUtil.URN_UUID) && (subjectType != null && subjectType.getURI().equals(AFOUtil.OWL_OBJECT_PROPERTY)))
+					|| isParent)
 			{
 				vizStatements.add(statement);
 			}
@@ -2387,6 +2418,11 @@ public class Cmap2TurtleConverter
 					// e.g. "2017-05-13T15:25:00Z"^^xsd:dateTime
 					literalValueAsObject = javax.xml.bind.DatatypeConverter.parseDateTime(literalValueString);
 				}
+				else if (AFOUtil.XSD_DATETIMESTAMP.getURI().equals(dataTypeIri))
+				{
+					// e.g. "2017-05-13T15:25:00Z"^^xsd:dateTimeStamp
+					literalValueAsObject = javax.xml.bind.DatatypeConverter.parseDateTime(literalValueString);
+				}
 				else if (AFOUtil.XSD_BOOLEAN.getURI().equals(dataTypeIri))
 				{
 					literalValueAsObject = Boolean.parseBoolean(literalValueString);
@@ -2765,5 +2801,89 @@ public class Cmap2TurtleConverter
 			return true;
 		}
 		return false;
+	}
+
+	private Model replaceNamedResources(Model model)
+	{
+		List<Statement> statementsToBeRemoved = new ArrayList<Statement>();
+		List<Statement> statementsToBeAdded = new ArrayList<Statement>();
+
+		StmtIterator stmtIterator = model.listStatements();
+		while (stmtIterator.hasNext())
+		{
+			Statement statement = stmtIterator.next();
+			if (statement.getSubject().isAnon())
+			{
+				continue;
+			}
+
+			if (!statement.getSubject().getURI().startsWith(CmapUtil.URN_UUID))
+			{
+				continue;
+			}
+
+			Resource subject = statement.getSubject();
+
+			boolean isIndividualToBeReplaced = false;
+			Resource typeResource = null;
+			StmtIterator namedResourceStmtIterator = model.listStatements(subject, AFOUtil.RDF_TYPE, (RDFNode) null);
+			while (namedResourceStmtIterator.hasNext())
+			{
+				Statement namedResourceStatement = namedResourceStmtIterator.next();
+				if (namedResourceStatement.getObject().isLiteral())
+				{
+					continue;
+				}
+
+				if (namedResourceStatement.getObject().isAnon())
+				{
+					continue;
+				}
+
+				// check if type of named resource belongs to a certain group of named individuals that are to be replaced
+				typeResource = namedResourceStatement.getResource();
+				if (typeResource.getURI().contains("qudt"))
+				{
+					if (model.listStatements((Resource) null, AFOUtil.QUDT_UNIT, subject).hasNext())
+					{
+						isIndividualToBeReplaced = true;
+						break;
+					}
+				}
+			}
+
+			if (!isIndividualToBeReplaced)
+			{
+				continue;
+			}
+
+			log.debug("Replacing statements for named individual: " + typeResource.getURI());
+			StmtIterator toBeReplacedStatementIterator = model.listStatements((Resource) null, (Property) null, subject);
+			while (toBeReplacedStatementIterator.hasNext())
+			{
+				Statement toBeReplacedStatement = toBeReplacedStatementIterator.next();
+				statementsToBeRemoved.add(toBeReplacedStatement);
+				statementsToBeAdded.add(model.createStatement(toBeReplacedStatement.getSubject(), toBeReplacedStatement.getPredicate(), typeResource));
+			}
+
+			StmtIterator toBeRemovedStatementIterator = model.listStatements(subject, (Property) null, (RDFNode) null);
+			while (toBeRemovedStatementIterator.hasNext())
+			{
+				Statement toBeRemovedStatement = toBeRemovedStatementIterator.next();
+				statementsToBeRemoved.add(toBeRemovedStatement);
+			}
+		}
+
+		if (!statementsToBeRemoved.isEmpty())
+		{
+			model = model.remove(statementsToBeRemoved);
+		}
+
+		if (!statementsToBeAdded.isEmpty())
+		{
+			model = model.add(statementsToBeAdded);
+		}
+
+		return model;
 	}
 }

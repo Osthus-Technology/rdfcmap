@@ -186,6 +186,7 @@ public class AFOUtil
 	public static final Property XSD_DOUBLE = ResourceFactory.createProperty(XSD_PREFIX + "double");
 	public static final Property XSD_STRING = ResourceFactory.createProperty(XSD_PREFIX + "string");
 	public static final Property XSD_DATETIME = ResourceFactory.createProperty(XSD_PREFIX + "dateTime");
+	public static final Property XSD_DATETIMESTAMP = ResourceFactory.createProperty(XSD_PREFIX + "dateTimeStamp");
 
 	public static final Property OBO_DEFINITION = ResourceFactory.createProperty(OBO_PREFIX + "IAO_0000115");
 	public static final Property OBO_DEFINITION_DISGUISED = ResourceFactory.createProperty(CmapUtil.URN_UUID + "IAO_0000115");

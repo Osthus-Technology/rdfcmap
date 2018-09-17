@@ -20,7 +20,7 @@ Use --help to see command line options
 How to create a cmap to be used with rdfcmap?
 
 1) Get CMAP Tools from https://cmap.ihmc.us/
-2) Create a new cmap following guidelines below on formatting 
+2) Create a new cmap following guidelines below on formatting, see [documentation of ADM](https://allotrope.gitlab.io/adm-patterns/Legend/index.html) for details about formatting of Allotrope data models 
 3) All nodes of a cmap model are transformed to instances in rdf model
 4) Labels of cmap nodes are transformed to titles of instances using dct:title 
 5) Links between nodes in cmap are transformed to object properties in rdf model.
@@ -29,6 +29,10 @@ How to create a cmap to be used with rdfcmap?
 8) Export cmap as CXL file
 
 Changelog:
+
+V2.4.0
+* improved processing of labels 
+* support LC-UV model CR/2018/07
 
 V2.3.4
 * improved sparql export
