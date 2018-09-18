@@ -1,34 +1,37 @@
 # rdf-cmap
 RDFCMap converts between CMap CXL and RDF TTL. 
 
-Usage to convert from CXL to TTL
+## Usage to convert from CXL to TTL
 "c:\path\to\jdk8\bin\java" -Dlog4j.configurationFile=resources/log4j2.xml -jar rdf-cmap.jar -i your-input-cmap-model.cxl
 
-Note: Conversion from CXL to TTL supports vocabulary of AFO2.0
+*Note: Conversion from CXL to TTL supports vocabulary of AFO2.0 as well as version CR/2018/07*
 
-Usage to convert from TTL to CXL:
+## Usage to convert from TTL to CXL:
 "c:\path\to\jdk8\bin\java" -Dlog4j.configurationFile=resources/log4j2.xml -jar rdf-cmap.jar -i your-input-rdf-model.ttl
 
-Usage to visualize data description of ADF as CXL:
+## Usage to visualize data description of ADF as CXL:
 "c:\path\to\jdk8\bin\java" -Dlog4j.configurationFile=resources/log4j2.xml -jar rdf-cmap.jar -i your-input-adf-file.adf
 
-Note: Creation of a useful visualizations of large graphs requires automatic layouting of nodes. Rdfcmap supports layouting based on graphviz as well as different layout algorithms provided by gephi. Please contact OSTHUS for further information (office(at)osthus(dot)com).  
+*Note: Creation of a useful visualizations of large graphs requires automatic layouting of nodes. Rdfcmap supports layouting based on graphviz as well as different layout algorithms provided by gephi. Please contact OSTHUS for further information (office(at)osthus(dot)com).*  
 
 Use --help to see command line options
 "c:\path\to\jdk8\bin\java" -Dlog4j.configurationFile=resources/log4j2.xml -jar rdf-cmap.jar --help
 
-How to create a cmap to be used with rdfcmap?
+## How to create a cmap to be used with rdfcmap?
 
-1) Get CMAP Tools from https://cmap.ihmc.us/
-2) Create a new cmap following guidelines below on formatting, see [documentation of ADM](https://allotrope.gitlab.io/adm-patterns/Legend/index.html) for details about formatting of Allotrope data models 
-3) All nodes of a cmap model are transformed to instances in rdf model
-4) Labels of cmap nodes are transformed to titles of instances using dct:title 
-5) Links between nodes in cmap are transformed to object properties in rdf model.
-6) Labels of links must agree to existing labels (skos:prefLabel) of properties in RDF vocabulary.
-7) Cardinalities can be added to object properties in cmap: default without specification of cardinality is "min 0". Exact cardinality is specified by adding the number, e.g. "has part =1" means there is exactly 1 link of "has part". Minimum cardinality is specified by ">1" (one or more)
-8) Export cmap as CXL file
+1.  Get CMAP Tools from https://cmap.ihmc.us/
+2.  Create a new cmap following guidelines below on formatting, see [documentation of ADM](https://allotrope.gitlab.io/adm-patterns/Legend/index.html) for details about formatting of Allotrope data models 
+3.  All nodes of a cmap model are transformed to instances in rdf model
+4.  Labels of cmap nodes are transformed to titles of instances using dct:title 
+5.  Links between nodes in cmap are transformed to object properties in rdf model.
+6.  Labels of links must agree to existing labels (skos:prefLabel) of properties in RDF vocabulary.
+7.  Cardinalities can be added to object properties in cmap: default without specification of cardinality is "min 0". Exact cardinality is specified by adding the number, e.g. "has part =1" means there is exactly 1 link of "has part". Minimum cardinality is specified by ">1" (one or more)
+8.  Export cmap as CXL file
 
-Changelog:
+# Changelog:
+
+V2.4.1
+* fixed IRIs of CHEBI instances 
 
 V2.4.0
 * improved processing of labels 
@@ -57,7 +60,7 @@ V2.1.4
 * Added Shape export
 * Added ADF export
 
-Copyright OSTHUS 2016-2018
+&copy;OSTHUS 2016-2018
 
 
  

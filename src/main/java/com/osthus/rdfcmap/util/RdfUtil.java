@@ -410,6 +410,10 @@ public class RdfUtil
 			}
 			else if (namespace.equals(AFOUtil.CHEBI_PREFIX))
 			{
+				if (aid.contains("CHEBI_"))
+				{
+					aid = aid.replaceAll("CHEBI", "");
+				}
 				Resource chebiResource = model.createResource(namespace + aid);
 				return chebiResource;
 			}
