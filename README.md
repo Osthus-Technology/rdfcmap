@@ -30,6 +30,9 @@ Use --help to see command line options
 
 # Changelog:
 
+V2.4.2
+* updated creation of SPARQL to support LC-UV model CR/2018/07
+
 V2.4.1
 * fixed IRIs of CHEBI instances 
 

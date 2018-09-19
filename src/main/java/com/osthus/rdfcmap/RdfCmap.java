@@ -148,6 +148,8 @@ public class RdfCmap
 
 	public static boolean visualizeLiterals = true;
 
+	public static String version = StringUtils.EMPTY;
+
 	/**
 	 * Main method of the CMap to RDF application.
 	 *
@@ -823,17 +825,22 @@ public class RdfCmap
 	{
 		final Properties properties = new Properties();
 		properties.load(Thread.currentThread().getContextClassLoader().getResourceAsStream("rdfcmap.properties"));
-		log.info("Rdfcmap V" + properties.getProperty("version") + " ©OSTHUS 2017-2018");
+		version = properties.getProperty("version");
+		log.info("Rdfcmap V" + version + " ©OSTHUS 2017-2018");
 	}
 
 	public static void printOsthus()
 	{
-		// @formatter:off
-		log.info("\r\n" + "  ____  ____________ ____  ______      \r\n" + " / __ \\/ __/_  __/ // / / / / __/      \r\n"
-				+ "/ /_/ /\\ \\  / / / _  / /_/ /\\ \\        \r\n" + "\\____/___/_/_/_/_//_/\\____/___/_   ___ \r\n"
-				+ "  / _ \\/ _ \\/ __/ ___/  |/  / _ | / _ \\\r\n" + " / , _/ // / _// /__/ /|_/ / __ |/ ___/\r\n"
-				+ "/_/|_/____/_/  \\___/_/  /_/_/ |_/_/  \r\n");
-		// @formatter:on
+		//@formatter:off
+		log.info("\r\n"
+				+ "  ____  ____________ ____  ______      \r\n" +
+				" / __ \\/ __/_  __/ // / / / / __/      \r\n" +
+				"/ /_/ /\\ \\  / / / _  / /_/ /\\ \\        \r\n" +
+				"\\____/___/_/_/_/_//_/\\____/___/_   ___ \r\n" +
+				"  / _ \\/ _ \\/ __/ ___/  |/  / _ | / _ \\\r\n" +
+				" / , _/ // / _// /__/ /|_/ / __ |/ ___/\r\n" +
+				"/_/|_/____/_/  \\___/_/  /_/_/ |_/_/  \r\n");
+		//@formatter:on
 	}
 
 	private static void configureLog(Level level)

@@ -1509,17 +1509,25 @@ public class Cmap2TurtleConverter
 						conceptProperties.put(ConceptProperty.IS_CLASS.name(), "true");
 					}
 				}
+
+				if (borderShape.equals("oval"))
+				{
+					if (borderStyle != null && (borderStyle.equals("dashed") || borderStyle.equals("dotted")))
+					{
+						log.debug("Found source node.");
+						conceptProperties.put(ConceptProperty.IS_SOURCE_NODE.name(), "true");
+					}
+					else
+					{
+						log.debug("Found target node.");
+						conceptProperties.put(ConceptProperty.IS_TARGET_NODE.name(), "true");
+					}
+				}
 			}
 
 			if (borderStyle != null && !borderStyle.isEmpty())
 			{
 				conceptProperties.put(ConceptProperty.BORDER_STYLE.name(), borderStyle);
-				if (borderStyle.equals("dotted") || borderStyle.equals("dashed"))
-				{
-					conceptProperties.put(ConceptProperty.IS_CLASS.name(), "true");
-					log.debug("Found class node with dashed/dotted border.");
-				}
-
 				if (borderShape != null && borderShape.equals("oval"))
 				{
 					if (borderStyle.equals("dashed"))
@@ -1531,6 +1539,14 @@ public class Cmap2TurtleConverter
 					{
 						log.debug("Found target node.");
 						conceptProperties.put(ConceptProperty.IS_TARGET_NODE.name(), "true");
+					}
+				}
+				else
+				{
+					if (borderStyle.equals("dotted") || borderStyle.equals("dashed"))
+					{
+						conceptProperties.put(ConceptProperty.IS_CLASS.name(), "true");
+						log.debug("Found class node with dashed/dotted border.");
 					}
 				}
 			}
@@ -1858,6 +1874,7 @@ public class Cmap2TurtleConverter
 		Files.deleteIfExists(ttlPath);
 		ttlPath = Files.createFile(ttlPath);
 		model.write(new FileOutputStream(ttlPath.toFile()), "TTL");
+		CmapUtil.appendSignature(ttlPath.toFile());
 
 		if (RdfCmap.writeSeparateFiles)
 		{
@@ -2093,6 +2110,7 @@ public class Cmap2TurtleConverter
 			Path vizTtlPath = Paths.get(outputFolder.getAbsolutePath() + "\\" + vizModelOutputFileName);
 			vizTtlPath = Files.createFile(vizTtlPath);
 			vizModel.write(new FileOutputStream(vizTtlPath.toFile()), "TTL");
+			CmapUtil.appendSignature(vizTtlPath.toFile());
 		}
 
 		Model instanceModel = preparedModels.getInstanceModel();
@@ -2102,6 +2120,7 @@ public class Cmap2TurtleConverter
 			Path instanceTtlPath = Paths.get(outputFolder.getAbsolutePath() + "\\" + instanceModelOutputFileName);
 			instanceTtlPath = Files.createFile(instanceTtlPath);
 			instanceModel.write(new FileOutputStream(instanceTtlPath.toFile()), "TTL");
+			CmapUtil.appendSignature(instanceTtlPath.toFile());
 
 			if (RdfCmap.humanReadable)
 			{
@@ -2656,6 +2675,7 @@ public class Cmap2TurtleConverter
 			Path vizTtlPath = Paths.get(outputFolder.getAbsolutePath() + "\\" + vizModelOutputFileName);
 			vizTtlPath = Files.createFile(vizTtlPath);
 			vizModel.write(new FileOutputStream(vizTtlPath.toFile()), "TTL");
+			CmapUtil.appendSignature(vizTtlPath.toFile());
 		}
 
 		otherTriplesModel.add(otherStatements);
@@ -2730,6 +2750,7 @@ public class Cmap2TurtleConverter
 			}
 			singleInstanceTtlPath = Files.createFile(singleInstanceTtlPath);
 			singleInstanceModel.write(new FileOutputStream(singleInstanceTtlPath.toFile()), "TTL");
+			CmapUtil.appendSignature(singleInstanceTtlPath.toFile());
 			singleInstanceModel.removeAll();
 
 			handledInstances.add(instanceId);
@@ -2755,6 +2776,7 @@ public class Cmap2TurtleConverter
 		Files.deleteIfExists(otherTtlPath);
 		otherTtlPath = Files.createFile(otherTtlPath);
 		otherTriplesModel.write(new FileOutputStream(otherTtlPath.toFile()), "TTL");
+		CmapUtil.appendSignature(otherTtlPath.toFile());
 	}
 
 	private static boolean isOboProperty(String label)

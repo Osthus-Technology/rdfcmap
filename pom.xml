@@ -2,7 +2,7 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>com.osthus</groupId>
 	<artifactId>rdf-cmap</artifactId>
-	<version>2.4.1</version>
+	<version>2.4.2</version>
 	<description>convert between CMap CXL and RDF TTL</description>
 	<properties>
 		<version.adf>1.2.0-RC2</version.adf>

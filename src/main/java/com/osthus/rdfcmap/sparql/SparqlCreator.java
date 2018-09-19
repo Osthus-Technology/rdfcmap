@@ -80,8 +80,29 @@ public class SparqlCreator
 		Model instanceModel = preparedModels.getInstanceModel();
 
 		String sparql = createSparql(instanceModel, model);
+		sparql = cleanPrefixes(sparql);
 		log.info("SPARQL: \n" + sparql);
 		write(pathToInputFile, sparql, model);
+	}
+
+	private String cleanPrefixes(String sparql)
+	{
+		String[] lines = sparql.split("\n");
+		for (int i = 0; i < lines.length; i++)
+		{
+			String line = lines[i];
+			if (!line.toLowerCase().startsWith("prefix "))
+			{
+				continue;
+			}
+			String prefix = line.split(" ")[1];
+			int numPrefix = StringUtils.countMatches(sparql, prefix);
+			if (numPrefix <= 1)
+			{
+				sparql = sparql.replaceAll(line + "\\n", "");
+			}
+		}
+		return sparql;
 	}
 
 	private String createSparql(Model model, Model fullModel)
@@ -133,6 +154,7 @@ public class SparqlCreator
 			throw new IllegalStateException("Missing target node for SPARQL query. Please verify that there exists a resource node with oval, solid border.");
 		}
 
+		sb.append("# SPARQL created with rdfcmap V" + RdfCmap.version + " (https://github.com/Osthus-Technology/rdfcmap)\n");
 		sb.append(Prefixes.getSparqlPrefixes() + "\n\n");
 		sb.append("select distinct ");
 
@@ -142,7 +164,8 @@ public class SparqlCreator
 		while (stmtIterator.hasNext())
 		{
 			Statement statement = stmtIterator.next();
-			if (statement.getPredicate().equals(VizUtil.AFV_IS_TARGET_NODE) || statement.getPredicate().equals(AFOUtil.RDF_TYPE))
+			if (statement.getPredicate().equals(VizUtil.AFV_IS_TARGET_NODE) || statement.getPredicate().equals(VizUtil.AFV_IS_SOURCE_NODE)
+					|| statement.getPredicate().equals(AFOUtil.RDF_TYPE))
 			{
 				// skip for query
 				continue;
@@ -216,6 +239,18 @@ public class SparqlCreator
 				continue;
 			}
 
+			if (statement.getPredicate().getURI().equals(VizUtil.AFV_IS_SOURCE_NODE.getURI())
+					|| statement.getPredicate().getURI().equals(VizUtil.AFV_IS_TARGET_NODE.getURI()))
+			{
+				continue;
+			}
+
+			if (statement.getPredicate().equals(AFOUtil.RDF_TYPE) && statement.getObject().isResource()
+					&& statement.getResource().equals(AFOUtil.OWL_NAMED_INDIVIDUAL))
+			{
+				continue;
+			}
+
 			handledStatements.add(statement);
 			handledStatementsAsStrings.add(statementAsString);
 
@@ -238,12 +273,19 @@ public class SparqlCreator
 						continue;
 					}
 
+					if (subjectStatement.getPredicate().equals(AFOUtil.RDF_TYPE) && subjectStatement.getObject().isResource()
+							&& subjectStatement.getResource().equals(AFOUtil.OWL_NAMED_INDIVIDUAL))
+					{
+						continue;
+					}
+
 					handledStatements.add(subjectStatement);
 					handledStatementsAsStrings.add(subjectStatementAsString);
 
 					Property subjectProperty = subjectStatement.getPredicate();
-					if (subjectProperty.equals(statement.getPredicate()) || subjectProperty.equals(VizUtil.AFV_IS_SOURCE_NODE)
-							|| subjectProperty.equals(VizUtil.AFV_IS_TARGET_NODE))
+					if (subjectProperty.getURI().equals(statement.getPredicate().getURI())
+							|| subjectProperty.getURI().equals(VizUtil.AFV_IS_SOURCE_NODE.getURI())
+							|| subjectProperty.getURI().equals(VizUtil.AFV_IS_TARGET_NODE.getURI()))
 					{
 						continue;
 					}
@@ -303,9 +345,16 @@ public class SparqlCreator
 						continue;
 					}
 
+					if (subjectStatement.getPredicate().equals(AFOUtil.RDF_TYPE) && subjectStatement.getObject().isResource()
+							&& subjectStatement.getResource().equals(AFOUtil.OWL_NAMED_INDIVIDUAL))
+					{
+						continue;
+					}
+
 					Property subjectProperty = subjectStatement.getPredicate();
-					if (subjectProperty.equals(statement.getPredicate()) || subjectProperty.equals(VizUtil.AFV_IS_SOURCE_NODE)
-							|| subjectProperty.equals(VizUtil.AFV_IS_TARGET_NODE))
+					if (subjectProperty.getURI().equals(statement.getPredicate().getURI())
+							|| subjectProperty.getURI().equals(VizUtil.AFV_IS_SOURCE_NODE.getURI())
+							|| subjectProperty.getURI().equals(VizUtil.AFV_IS_TARGET_NODE.getURI()))
 					{
 						continue;
 					}
@@ -318,8 +367,8 @@ public class SparqlCreator
 
 					graphStatementsAsStrings.add(getStatementString(model, fullModel, subjectStatement));
 				}
-				}
 			}
+		}
 
 		for (Iterator<String> iterator = graphStatementsAsStrings.iterator(); iterator.hasNext();)
 		{

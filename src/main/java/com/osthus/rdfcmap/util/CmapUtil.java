@@ -1,10 +1,14 @@
 package com.osthus.rdfcmap.util;
 
+import java.io.BufferedWriter;
 import java.io.ByteArrayInputStream;
+import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.OutputStreamWriter;
+import java.io.Writer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -48,6 +52,8 @@ import com.osthus.rdfcmap.cmap.cardinality.CardinalityEnum;
 import com.osthus.rdfcmap.cmap.cardinality.CardinalityPattern;
 import com.osthus.rdfcmap.enums.ColorScheme;
 import com.osthus.rdfcmap.enums.DomainEnum;
+
+import de.osthus.ambeth.exception.RuntimeExceptionUtil;
 
 /**
  * @author Helge Krieg, OSTHUS GmbH
@@ -338,7 +344,7 @@ public class CmapUtil
 				Statement anonStatement = anonIterator.next();
 				if (!statements.contains(anonStatement))
 				{
-				statements.add(anonStatement);
+					statements.add(anonStatement);
 					statements = addStatementsWithBlankNodes(model, anonStatement, statements);
 				}
 			}
@@ -939,9 +945,9 @@ public class CmapUtil
 		model = AdfCreator.read(pathToInputFile, model, log);
 
 		if (RdfCmap.removeBnodes)
-			{
+		{
 			model = RdfUtil.convertBlankNodesToNamedResources(model);
-			}
+		}
 
 		if (RdfCmap.userSpecifiedInstanceNamespaces != null && !RdfCmap.userSpecifiedInstanceNamespaces.isEmpty())
 		{
@@ -959,12 +965,12 @@ public class CmapUtil
 
 			model.write(output, "NTriples");
 			dataDescriptionAsString = output.toString(StandardCharsets.UTF_8);
-		dataDescriptionAsString = disguiseConceptsForVisualizationAsInstancesWithUrnUuid(dataDescriptionAsString);
-
-		ByteArrayInputStream is = new ByteArrayInputStream(dataDescriptionAsString.getBytes(StandardCharsets.UTF_8));
+			dataDescriptionAsString = disguiseConceptsForVisualizationAsInstancesWithUrnUuid(dataDescriptionAsString);
+			ByteArrayInputStream is = new ByteArrayInputStream(dataDescriptionAsString.getBytes(StandardCharsets.UTF_8));
 			model.removeAll();
-		model.read(is, "NTriples");
+			model.read(is, "NTriples");
 		}
+
 		return model;
 	}
 
@@ -1005,6 +1011,22 @@ public class CmapUtil
 		ByteArrayInputStream is = new ByteArrayInputStream(modelAsString.getBytes(StandardCharsets.UTF_8));
 		model.read(is, null, serialization);
 		return model;
+	}
+
+	public static void appendSignature(File file)
+	{
+		try (Writer writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(file, true), "UTF-8")))
+		{
+			writer.append("\n");
+			writer.append("\n");
+			writer.append("# created with rdfcmap V" + RdfCmap.version + " (https://github.com/Osthus-Technology/rdfcmap)");
+		}
+		catch (IOException e)
+		{
+			log.info("Error appending signature to file: " + file.getAbsolutePath());
+			throw RuntimeExceptionUtil.mask(e);
+		}
+		;
 	}
 
 	private static String disguiseConceptsForVisualizationAsInstancesWithUrnUuid(String modelAsString)
