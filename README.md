@@ -1,4 +1,4 @@
-# **Archived** This code repository has moved. Development continues at [Gitlab/allotrope-open-source/rdfcmp](https://gitlab.com/allotrope-open-source/rdfcmap)
+# **Archived:** This code repository has moved. Development continues at [Gitlab/allotrope-open-source/rdfcmp](https://gitlab.com/allotrope-open-source/rdfcmap)
 
 # rdf-cmap
 RDFCMap converts between CMap CXL and RDF TTL. 
